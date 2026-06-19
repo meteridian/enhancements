@@ -101,7 +101,7 @@ to a global telco sovereign cloud.
 | FR-307 | Hierarchical budgets (org > team > user) with inheritance | Must |
 | FR-308 | Overage handling: PayGo, auto-top-up, hard block, or throttle | Must |
 | FR-309 | Abstract credit units with versioned conversion rates | Must |
-| FR-310 | DePIN settlement: emit on-chain burn events for decentralized infra | Nice |
+| FR-310 | Capacity tokenization: support capacity token issuance and redemption via custom block | Nice |
 
 ### FR-400: Cost Allocation and Virtual Tags
 
@@ -110,7 +110,7 @@ to a global telco sovereign cloud.
 | FR-401 | Showback: display costs by project/team/resource without billing | Must |
 | FR-402 | Chargeback: bill internal departments for resource consumption | Must |
 | FR-403 | Platform cost distribution (proportional by CPU, memory, or custom) | Must |
-| FR-404 | Worker/unallocated cost distribution to user namespaces | Must |
+| FR-404 | Worker and unallocated cost distribution to user namespaces (when configured) | Must |
 | FR-405 | Virtual tags: computed labels from rules (no manual tagging required) | Must |
 | FR-406 | Virtual tag chaining (tag A depends on tag B) | Must |
 | FR-407 | Visual rule builder for virtual tags (no coding required) | Must |
@@ -156,10 +156,10 @@ to a global telco sovereign cloud.
 | FR-702 | Cost forecasting (next month, quarter, year) | Must |
 | FR-703 | Rightsizing recommendations via robne integration | Must |
 | FR-704 | AI-driven recommendations via Kubernaut integration | Should |
-| FR-705 | Pricing simulation (what-if on historical data) | Must |
+| FR-705 | Pricing simulation (what-if on historical data) | Should |
 | FR-706 | Commitment utilization tracking with waste alerts | Must |
 | FR-707 | Unit economics calculation (cost per transaction/user/feature) | Should |
-| FR-708 | Carbon emissions estimation (kWh to CO2e) | Should |
+| FR-708 | Carbon emissions estimation (kWh to CO2e) | Nice |
 | FR-709 | Predictive budget exhaustion alerts | Must |
 | FR-710 | Optimization recommendation approval workflow | Should |
 
@@ -168,14 +168,14 @@ to a global telco sovereign cloud.
 | ID | Requirement | Priority |
 |----|-------------|----------|
 | FR-801 | RESTful API for all platform capabilities | Must |
-| FR-802 | FOCUS v1.1 native export (Parquet to S3/GCS) | Must |
+| FR-802 | FOCUS v1.4 native export (Parquet to S3/GCS) | Must |
 | FR-803 | Lago integration (billing delegation) | Must |
 | FR-804 | Stripe Billing integration | Should |
 | FR-805 | ServiceNow ITFM integration | Should |
 | FR-806 | SAP S/4HANA integration (OData) | Nice |
 | FR-807 | Scheduled data extracts (CSV, Parquet, JSON to S3/SFTP/webhook) | Must |
 | FR-808 | SQL-based billable metric definitions | Must |
-| FR-809 | TM Forum API compliance (TMF635, TMF678) as adapter | Should |
+| FR-809 | TM Forum API compliance (TMF635, TMF678) as adapter | Nice |
 | FR-810 | CloudEvents emission for all state changes | Must |
 
 ### FR-900: Portals and UX
@@ -222,6 +222,7 @@ to a global telco sovereign cloud.
 | FR-1108 | Observability: metrics, logs, traces (Prometheus, OTel) | Must |
 | FR-1109 | Zero-downtime upgrades (rolling deployments) | Must |
 | FR-1110 | Multi-region deployment with federated view | Should |
+| FR-1111 | OpenShift Operator for deployment and lifecycle management | Should |
 
 ---
 

@@ -5,7 +5,7 @@
 - **Created:** 2026-06-18
 - **Last Updated:** 2026-06-18
 - **Depends on:** METR-0002 (Platform Extensibility)
-- **Related:** METR-0003 (Product Catalog), METR-0004 (Credit/Token Billing), METR-0005 (Internal Budget Units)
+- **Related:** METR-0003 (Product Catalog), METR-0004 (Credit, Prepaid, and Token Billing), METR-0005 (Internal Budget Units)
 
 ---
 
@@ -252,10 +252,10 @@ Diagnose common development issues.
 meteridian doctor
 ```
 
-- Checks: Go/Python/Rust toolchain versions, required dependencies, port
-  availability (emulator ports), Docker/Podman availability (for container builds),
+- Checks: Go, Python, and Rust toolchain versions, required dependencies, port
+  availability (emulator ports), Docker or Podman availability (for container builds),
   network connectivity to marketplace registry.
-- Outputs: pass/fail for each check, actionable fix suggestions for failures.
+- Outputs: pass or fail for each check, actionable fix suggestions for failures.
 - Example output:
   ```
   ✓ Go 1.25.0 (>= 1.24 required)
@@ -336,7 +336,7 @@ Emulator Suite (multi-service local simulation).
 - **Observability UI:** A web-based dashboard (served on `localhost:9091`) showing
   block logs, metrics, traces, and data flow visualization.
 - **Block Sandbox:** The block process itself, managed by the emulator. Supports
-  both in-process (Go plugin) and out-of-process (gRPC/Arrow Flight) execution
+  both in-process (Go plugin) and out-of-process (gRPC and Arrow Flight) execution
   models, matching the production runtime.
 
 ### 4.3 Starting the Emulator
@@ -371,7 +371,7 @@ debugger support:
 - **Go blocks:** Delve (`dlv`) is started in headless mode. The CLI prints the
   `dlv connect` command and the VS Code launch configuration.
 - **Python blocks:** `debugpy` is started on a configurable port. The CLI prints
-  the VS Code/PyCharm attach configuration.
+  the VS Code and PyCharm attach configuration.
 - **Rust blocks:** `rust-lldb` or `rust-gdb` attach instructions are printed.
 
 The emulator pauses event delivery until the debugger is attached, preventing
@@ -513,7 +513,7 @@ class UsageNormalizer:
   native data type throughout.
 - **Async support:** `@on_batch` handlers can be `async def` for I/O-heavy blocks
   (enrichers calling external APIs, sinks writing to databases).
-- **gRPC/Arrow Flight transport:** Python blocks run as gRPC servers, communicating
+- **gRPC and Arrow Flight transport:** Python blocks run as gRPC servers, communicating
   with the runtime via Arrow Flight. The SDK handles all transport boilerplate.
 
 ### 5.4 Future SDKs
@@ -951,7 +951,7 @@ real-time performance data from blocks running in the local emulator.
 |---|---|---|
 | Batch Latency | Histogram (p50/p95/p99) | OpenTelemetry spans |
 | Throughput | Time-series gauge (batches/sec) | Block router metrics |
-| Memory | Timeline (RSS, heap, stack) | Runtime metrics (pprof/pymalloc) |
+| Memory | Timeline (RSS, heap, stack) | Runtime metrics (pprof and pymalloc) |
 | Data Flow | Sankey diagram (input → block → output) | Emulator routing |
 | Error Rate | Counter and timeline | Block error handler |
 | State Store | Operations/sec, key count | State store instrumentation |
@@ -1328,7 +1328,7 @@ chained together) or only single-block testing?
   complexity.
 
 **Recommendation:** Support pipeline-level testing in v1.1 (not v1.0). v1.0
-focuses on single-block testing with well-defined input/output contracts. Pipeline
+focuses on single-block testing with well-defined input and output contracts. Pipeline
 testing is explicitly a follow-up feature.
 
 ### 13.2 Block Dependencies
@@ -1402,7 +1402,7 @@ and emulator integration. JetBrains plugin is a community contribution opportuni
    `meteridian emulator`.
 
 3. **Firebase Emulator Suite** — [firebase.google.com/docs/emulator-suite](https://firebase.google.com/docs/emulator-suite)
-   Multi-service local emulator with UI, data import/export, and CI integration.
+   Multi-service local emulator with UI, data import and export, and CI integration.
    Architecture reference for the Meteridian local development emulator.
 
 4. **VS Code Extension API** — [code.visualstudio.com/api](https://code.visualstudio.com/api)

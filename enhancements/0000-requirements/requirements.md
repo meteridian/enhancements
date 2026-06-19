@@ -25,9 +25,8 @@ to a global telco sovereign cloud.
 
 ## Non-Goals
 
-1. OCI provider support (deprecated)
-2. Full invoice generation (delegate to Lago/Stripe/SAP)
-3. Building a general-purpose ERP
+1. Full invoice generation (delegate to Lago/Stripe/SAP)
+2. Building a general-purpose ERP
 4. Requiring blockchain infrastructure for core functionality
 5. Replacing existing monitoring systems (consume their data instead)
 

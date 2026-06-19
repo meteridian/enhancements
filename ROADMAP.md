@@ -40,6 +40,7 @@ Target: First usable release with core metering, rating, and billing.
 | [METR-0008](enhancements/0008-compliance-as-code/compliance-as-code.md) | Compliance-as-Code and Audit Trail Guarantees | draft |
 | [METR-0009](enhancements/0009-e-invoicing-engine/e-invoicing-engine.md) | Native E-Invoicing Engine | draft |
 | [METR-0010](enhancements/0010-ai-metering/ai-metering.md) | AI Workload Metering | draft |
+| [METR-0011](enhancements/0011-enforcement-integration/enforcement-integration.md) | Enforcement Integration (Closed-Loop via Limitador) | draft |
 
 ### Key Decisions (ADRs)
 
@@ -62,6 +63,7 @@ Target: First usable release with core metering, rating, and billing.
 | [ADR-0015](docs/adr/0015-compliance-policy-engine.md) | Compliance policy engine (embedded OPA/Rego) | Accepted |
 | [ADR-0016](docs/adr/0016-einvoice-canonical-model.md) | E-invoice canonical model (EN 16931) | Accepted |
 | [ADR-0017](docs/adr/0017-fedramp-boundary-architecture.md) | FedRAMP boundary architecture and sovereign cloud deployment | Accepted |
+| [ADR-0018](docs/adr/0018-closed-loop-enforcement-limitador.md) | Closed-loop enforcement via Limitador (dual-path) | Accepted |
 
 ### v1.0 Scope
 
@@ -76,6 +78,7 @@ Target: First usable release with core metering, rating, and billing.
 - Marketplace with SLSA/Sigstore provenance (Tier 0-2 blocks via gRPC)
 - OCP, AWS, Azure, GCP provider support
 - AI workload metering: LLM token dimensions, GPU compute metrics, tiered token pricing (METR-0010)
+- Closed-loop enforcement integration: Balance Check API and Limitador quota push (METR-0011, ADR-0018)
 - Immutable audit trail with cryptographic hash chains (METR-0008, ADR-0014)
 - Sequential invoice numbering with gap detection
 - PII separation and selective erasure (GDPR-compatible data model)

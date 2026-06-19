@@ -3,9 +3,9 @@
 - **Status:** provisional
 - **Authors:** @pgarciaq, @jordigilh
 - **Created:** 2026-06-18
-- **Last Updated:** 2026-06-18
+- **Last Updated:** 2026-06-19
 - **Depends on:** METR-0002 (Extensibility), METR-0003 (Product Catalog)
-- **Related:** METR-0005 (Internal Budget Units)
+- **Related:** METR-0005 (Internal Budget Units), METR-0011 (Enforcement Integration)
 
 ---
 
@@ -18,10 +18,11 @@
 5. [Prepaid Balance Management](#5-prepaid-balance-management)
 6. [Credit Conversion Rates](#6-credit-conversion-rates)
 7. [Bill Shock Prevention](#7-bill-shock-prevention)
-8. [API](#8-api)
-9. [Integration with Block Runtime](#9-integration-with-block-runtime)
-10. [Open Questions](#10-open-questions)
-11. [References](#11-references)
+8. [Graduated Degradation Policies](#8-graduated-degradation-policies)
+9. [API](#9-api)
+10. [Integration with Block Runtime](#10-integration-with-block-runtime)
+11. [Open Questions](#11-open-questions)
+12. [References](#12-references)
 
 ---
 
@@ -141,7 +142,7 @@ credit:grant:{grant_id}:remaining   → remaining balance for this grant (string
 
 Valkey operations use `MULTI/EXEC` transactions to ensure atomicity of balance
 updates. The PostgreSQL ledger is the source of truth; Valkey is a read-optimized
-projection that is reconciled periodically (see Section 9.3).
+projection that is reconciled periodically (see Section 10.3).
 
 ### 3.3 Credit Ledger
 
@@ -447,7 +448,7 @@ Spend limits can be enforced at multiple levels of the tenant hierarchy:
 - **Namespace-level**: Per-Kubernetes-namespace budget (for OCP workloads)
 - **User-level**: Individual developer spend limits
 
-Guardrails are evaluated in the balance-check block (Section 9.1). When a
+Guardrails are evaluated in the balance-check block (Section 10.1). When a
 guardrail is hit, the configured action is taken.
 
 ### 7.3 Automatic Actions at Thresholds
@@ -490,9 +491,496 @@ remaining budget consumed in a single event).
 
 ---
 
-## 8. API
+## 8. Graduated Degradation Policies
 
-### 8.1 Credit Grants
+Bill shock prevention (§7) defines *what* happens when spend thresholds are
+crossed. Graduated degradation policies define *how* the system responds over
+time — the full lifecycle from early warning through service restriction to
+eventual suspension, and the recovery path when the situation resolves.
+
+A degradation policy is a configurable template that codifies the graduated
+response sequence: warning, throttle, block, and suspend — with explicit timing,
+escalation rules, and auto-recovery behavior at each stage. Policies are
+reusable across tenants and inheritable through the account hierarchy
+(METR-0005 §6).
+
+### 8.1 Policy Template Model
+
+A degradation policy template defines an ordered sequence of stages, each with
+a trigger condition, grace period, actions, and escalation behavior.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Policy template identifier |
+| `name` | String | Human-readable policy name (e.g., "Standard Prepaid Policy") |
+| `description` | String | Policy purpose and behavior summary |
+| `trigger` | Enum | What initiates evaluation: `balance_threshold`, `payment_failure`, or `both` |
+| `stages` | Array | Ordered list of degradation stages (see §8.2) |
+| `recovery` | Object | Auto-recovery configuration (see §8.5) |
+| `inheritance` | Object | Policy cascade and override rules (see §8.6) |
+| `metadata` | JSONB | Arbitrary key-value pairs for operator-specific extensions |
+| `created_at` | Timestamp | Creation time |
+| `updated_at` | Timestamp | Last modification time |
+
+Policies are versioned. When a policy is updated, tenants using it continue on
+the version that was active when their current degradation cycle began. New
+cycles use the latest version.
+
+### 8.2 Degradation Stages
+
+Each stage in the policy defines a threshold, a set of actions, timing
+constraints, and escalation rules.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | String | Stage identifier (e.g., "warning", "alert", "throttle", "block", "suspend") |
+| `order` | Integer | Evaluation order (lower = triggered first) |
+| `condition` | Object | Trigger condition for this stage (see below) |
+| `grace_period` | Duration | Time to wait after condition is met before executing actions |
+| `actions` | Array | Actions to execute when the stage activates (see §8.3) |
+| `cooldown` | Duration | Minimum time this stage remains active before escalating |
+| `repeat_notification` | Duration | Interval for repeating notifications while the stage is active (nullable = notify once) |
+
+**Condition types:**
+
+| Trigger | Condition Field | Example |
+|---------|----------------|---------|
+| Balance threshold | `{ "type": "balance_percent", "threshold": 50 }` | Activate when 50% of balance is consumed |
+| Balance absolute | `{ "type": "balance_amount", "threshold": 100.00, "currency": "USD" }` | Activate when balance drops below $100 |
+| Payment failure count | `{ "type": "payment_failure_count", "threshold": 1 }` | Activate after 1 failed payment attempt |
+| Payment failure duration | `{ "type": "payment_failure_duration", "threshold": "72h" }` | Activate when payment has been failing for 72 hours |
+
+**Example: Standard prepaid degradation policy**
+
+```json
+{
+  "name": "Standard Prepaid Policy",
+  "trigger": "both",
+  "stages": [
+    {
+      "name": "warning",
+      "order": 1,
+      "condition": { "type": "balance_percent", "threshold": 50 },
+      "grace_period": "0s",
+      "actions": [
+        { "type": "notify", "channels": ["email"], "template": "balance_warning" }
+      ],
+      "cooldown": "0s",
+      "repeat_notification": null
+    },
+    {
+      "name": "alert",
+      "order": 2,
+      "condition": { "type": "balance_percent", "threshold": 75 },
+      "grace_period": "0s",
+      "actions": [
+        { "type": "notify", "channels": ["email", "webhook"], "template": "balance_alert" }
+      ],
+      "cooldown": "0s",
+      "repeat_notification": "24h"
+    },
+    {
+      "name": "throttle",
+      "order": 3,
+      "condition": { "type": "balance_percent", "threshold": 90 },
+      "grace_period": "1h",
+      "actions": [
+        { "type": "notify", "channels": ["email", "webhook", "pagerduty"], "template": "balance_critical" },
+        { "type": "enforce", "signal": "throttle", "parameters": { "rate_limit_percent": 25 } }
+      ],
+      "cooldown": "4h",
+      "repeat_notification": "4h"
+    },
+    {
+      "name": "block",
+      "order": 4,
+      "condition": { "type": "balance_percent", "threshold": 100 },
+      "grace_period": "2h",
+      "actions": [
+        { "type": "notify", "channels": ["email", "webhook", "pagerduty"], "template": "balance_exhausted" },
+        { "type": "enforce", "signal": "block", "parameters": {} }
+      ],
+      "cooldown": "0s",
+      "repeat_notification": "12h"
+    }
+  ],
+  "recovery": {
+    "auto_restore": true,
+    "restore_cooldown": "5m",
+    "restore_threshold_percent": 10
+  },
+  "inheritance": {
+    "mode": "cascade",
+    "allow_override": true,
+    "override_restriction": "can_only_tighten"
+  }
+}
+```
+
+### 8.3 Stage Actions
+
+Each stage can execute one or more actions. Actions are composable and executed
+in declaration order.
+
+#### 8.3.1 Notification Actions
+
+Notification actions deliver alerts through configured channels.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"notify"` | Action type identifier |
+| `channels` | Array | Delivery channels: `email`, `webhook`, `pagerduty`, `slack`, `in_app` |
+| `template` | String | Notification template identifier (determines message content) |
+| `recipients` | Array | Override recipients (default: tenant billing contacts) |
+| `severity` | Enum | `info`, `warning`, `critical` (used for channel routing) |
+
+Webhook notifications use the CloudEvents v1.0 format (ADR-0004) with a
+`type` field indicating the degradation event (e.g.,
+`com.meteridian.credit.degradation.throttle`). The webhook payload includes
+the current balance, the triggered stage, and recommended actions.
+
+#### 8.3.2 Enforcement Actions
+
+Enforcement actions emit signals that restrict service access. These signals
+are consumed by external enforcement points — primarily Limitador (METR-0011)
+for RHOAI and MaaS gateway deployments, or custom enforcement listeners via
+webhooks for other environments.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"enforce"` | Action type identifier |
+| `signal` | Enum | `throttle`, `downgrade_tier`, `block`, `suspend` |
+| `parameters` | Object | Signal-specific parameters (see below) |
+
+**Signal parameters:**
+
+| Signal | Parameters | Description |
+|--------|-----------|-------------|
+| `throttle` | `rate_limit_percent` (Integer, 1-100) | Reduce allowed request rate to this percentage of the tenant's normal quota. Implemented by updating Limitador counters. |
+| `downgrade_tier` | `target_tier` (String) | Restrict to a lower service tier (e.g., force "basic" models only in an AI inference context). Implemented via Limitador descriptors or webhook metadata. |
+| `block` | — | Reject all new requests (HTTP 402). Existing in-flight requests complete. Implemented by setting Limitador quota to zero. |
+| `suspend` | `drain_period` (Duration) | Gracefully terminate all active workloads after the drain period. Emits a `service.suspended` webhook for orchestrator integration. |
+
+**Limitador integration (METR-0011):** For deployments using Red Hat
+Connectivity Link, enforcement signals translate directly to Limitador API
+calls. Meteridian maintains a mapping from tenant degradation state to
+Limitador quota values:
+
+| Degradation State | Limitador Action |
+|-------------------|-----------------|
+| Normal | Set quota to tenant's contracted rate limit |
+| Throttle (25%) | Set quota to 25% of contracted rate limit |
+| Block | Set quota to 0 (all requests rejected with 429) |
+| Recovered | Restore quota to contracted rate limit |
+
+For deployments without Limitador, enforcement signals are delivered as
+webhook events. The receiving system (orchestrator, API gateway, or custom
+admission controller) is responsible for interpreting and applying the signal.
+
+#### 8.3.3 Administrative Actions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | `"admin"` | Action type identifier |
+| `action` | Enum | `flag_for_review`, `create_ticket`, `escalate` |
+| `parameters` | Object | Action-specific parameters (assignee, priority, etc.) |
+
+Administrative actions create internal work items for billing operations teams.
+They are useful for stages that require human judgment (e.g., deciding whether
+to terminate a long-running contract customer vs. extending a grace period).
+
+### 8.4 Payment Failure Degradation (Rainy Day Handling)
+
+When a payment fails (auto-reload charge declined, invoice payment bounced),
+the system enters a separate degradation track. Payment failure degradation
+can run concurrently with balance-based degradation — the more restrictive
+stage governs.
+
+**Payment retry schedule:**
+
+| Attempt | Delay After Previous | Action on Failure |
+|---------|---------------------|-------------------|
+| 1 (initial) | Immediate | Retry silently; log `payment.failed` event |
+| 2 | 4 hours | Retry; notify tenant via email |
+| 3 | 24 hours | Retry; notify tenant via email and webhook |
+| 4 | 48 hours | Retry; escalate to `throttle` stage |
+| 5 | 72 hours | Final retry; escalate to `block` stage |
+| — | After attempt 5 | No more retries; escalate to `suspend` stage |
+
+The retry schedule is configurable per policy template. Each retry attempt
+charges the same payment method by default. If the tenant has multiple payment
+methods on file, the system can be configured to cycle through them
+(`fallback_payment_methods: true`).
+
+**Payment failure policy fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `retry_schedule` | Array | List of `{ "delay": Duration, "actions": [...] }` entries |
+| `max_retries` | Integer | Maximum retry attempts before suspension |
+| `fallback_payment_methods` | Boolean | Whether to try alternate payment methods |
+| `final_action` | Enum | Action after all retries exhausted: `suspend`, `block`, `flag_for_review` |
+
+**Example: Payment failure policy**
+
+```json
+{
+  "trigger": "payment_failure",
+  "stages": [
+    {
+      "name": "retry_warning",
+      "order": 1,
+      "condition": { "type": "payment_failure_count", "threshold": 1 },
+      "grace_period": "0s",
+      "actions": [
+        { "type": "notify", "channels": ["email"], "template": "payment_failed_retry" }
+      ],
+      "cooldown": "4h",
+      "repeat_notification": null
+    },
+    {
+      "name": "retry_alert",
+      "order": 2,
+      "condition": { "type": "payment_failure_count", "threshold": 3 },
+      "grace_period": "0s",
+      "actions": [
+        { "type": "notify", "channels": ["email", "webhook"], "template": "payment_failed_escalation" },
+        { "type": "admin", "action": "flag_for_review", "parameters": { "priority": "high" } }
+      ],
+      "cooldown": "24h",
+      "repeat_notification": "24h"
+    },
+    {
+      "name": "payment_throttle",
+      "order": 3,
+      "condition": { "type": "payment_failure_duration", "threshold": "48h" },
+      "grace_period": "0s",
+      "actions": [
+        { "type": "notify", "channels": ["email", "webhook", "pagerduty"], "template": "payment_throttle" },
+        { "type": "enforce", "signal": "throttle", "parameters": { "rate_limit_percent": 50 } }
+      ],
+      "cooldown": "24h",
+      "repeat_notification": "12h"
+    },
+    {
+      "name": "payment_block",
+      "order": 4,
+      "condition": { "type": "payment_failure_duration", "threshold": "96h" },
+      "grace_period": "0s",
+      "actions": [
+        { "type": "notify", "channels": ["email", "webhook", "pagerduty"], "template": "payment_blocked" },
+        { "type": "enforce", "signal": "block", "parameters": {} },
+        { "type": "admin", "action": "escalate", "parameters": { "assignee": "billing_ops" } }
+      ],
+      "cooldown": "0s",
+      "repeat_notification": "24h"
+    }
+  ]
+}
+```
+
+### 8.5 Auto-Recovery
+
+When the condition that triggered degradation resolves — a payment succeeds,
+the balance is replenished via top-up or new credit grant — the system
+automatically restores full service. Auto-recovery is critical for customer
+experience: restrictions should be lifted promptly, not left in place until a
+human intervenes.
+
+**Recovery configuration:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `auto_restore` | Boolean | Whether recovery is automatic (default: `true`) |
+| `restore_cooldown` | Duration | Minimum time after resolution before restoring service (prevents flapping) |
+| `restore_threshold_percent` | Integer | Minimum balance (as a percentage of the stage's trigger threshold) required to exit degradation. Prevents immediate re-entry if the top-up is marginal. |
+| `restore_order` | Enum | `immediate` (restore all at once) or `graduated` (reverse through stages) |
+| `notify_on_restore` | Boolean | Whether to send a restoration notification (default: `true`) |
+
+**Recovery triggers:**
+
+| Trigger | Behavior |
+|---------|----------|
+| Balance replenished (top-up or new grant) | If `effective_balance` rises above the active stage's threshold (adjusted by `restore_threshold_percent`), exit the stage. If it rises above all stage thresholds, full recovery. |
+| Payment succeeds (after failures) | Clear the payment failure counter. If the balance is sufficient, exit all payment-failure stages. If auto-reload was triggered by the successful payment, wait for the reload to complete before evaluating balance stages. |
+| Manual override | An administrator can force recovery via the API, bypassing threshold checks. Recorded in the audit trail. |
+
+**Graduated vs. immediate restoration:**
+
+- **`immediate`** (default): When recovery conditions are met, the system
+  jumps directly from the current degraded state to normal operation. The
+  Limitador quota (or webhook signal) is restored to the tenant's contracted
+  rate limit in a single operation.
+- **`graduated`**: The system steps back through degradation stages in reverse
+  order, spending `restore_cooldown` at each stage. This is useful for
+  high-value tenants where a sudden traffic spike after restoration could
+  overwhelm downstream systems.
+
+**Flap prevention:** The `restore_cooldown` timer prevents rapid cycling
+between degraded and normal states. If a tenant's balance oscillates around a
+threshold (e.g., due to bursty consumption patterns), the cooldown ensures
+that enforcement signals are not toggled faster than downstream systems can
+process them.
+
+### 8.6 Policy Inheritance and Account Hierarchy
+
+Degradation policies integrate with the hierarchical account model (METR-0005
+§6). Policies defined at a parent account level cascade to sub-accounts,
+providing organizational guardrails while allowing per-team customization.
+
+**Inheritance modes:**
+
+| Mode | Behavior |
+|------|----------|
+| `cascade` | Parent policy applies to all sub-accounts. Sub-accounts inherit the parent's stages, timing, and actions unless overridden. |
+| `independent` | Each account defines its own policy. No inheritance. |
+| `hybrid` | Parent defines minimum enforcement stages (e.g., "block at 100%" is mandatory). Sub-accounts can add stricter stages but cannot remove or weaken inherited ones. |
+
+**Override restrictions:**
+
+| Restriction | Behavior |
+|-------------|----------|
+| `can_only_tighten` | Sub-accounts can add stages or lower thresholds but cannot remove stages or raise thresholds above the parent's values. |
+| `can_customize_timing` | Sub-accounts can adjust grace periods and cooldowns but cannot change stage actions or thresholds. |
+| `full_override` | Sub-accounts can define a completely independent policy. Parent policy is informational only. |
+
+**Example: Enterprise with team budgets**
+
+An enterprise parent account sets a policy: "throttle at 90%, block at 100%."
+Individual teams can customize within those bounds:
+
+- Team A (conservative): adds a warning at 50% and throttle at 80% — stricter
+  than the parent, which is allowed.
+- Team B (aggressive): attempts to remove the block at 100% — denied, because
+  `can_only_tighten` prevents weakening inherited stages.
+- Team C (default): inherits the parent policy as-is.
+
+### 8.7 Policy Assignment
+
+Degradation policies are assigned to tenants, projects, or namespaces through
+the policy assignment API. Multiple policies can be active simultaneously
+(e.g., a balance-based policy and a payment-failure policy). When multiple
+policies produce conflicting signals, the most restrictive signal governs.
+
+**Assignment model:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `policy_id` | UUID | Reference to the policy template |
+| `target_type` | Enum | `tenant`, `project`, `namespace` |
+| `target_id` | UUID | Identifier of the target entity |
+| `effective_date` | Timestamp | When the assignment takes effect |
+| `end_date` | Timestamp | When the assignment expires (nullable for indefinite) |
+
+**Built-in policy templates:**
+
+Meteridian ships with a set of default policy templates that cover common
+billing scenarios. Operators can use these as-is or customize them.
+
+| Template | Description | Stages |
+|----------|-------------|--------|
+| `prepaid-standard` | Standard prepaid balance policy with graduated response | Warning at 50%, alert at 75%, throttle at 90% (1h grace), block at 100% (2h grace) |
+| `prepaid-strict` | Strict prepaid policy for self-service and trial accounts | Warning at 50%, block at 90% (no grace period) |
+| `enterprise-soft` | Enterprise policy with soft enforcement and long grace periods | Warning at 75%, alert at 90%, throttle at 95% (24h grace), block at 100% (72h grace, flag for review) |
+| `payment-retry-standard` | Standard payment failure retry schedule | Retry 5 times over 5 days, escalating from notify to throttle to block |
+| `payment-retry-enterprise` | Enterprise payment failure policy with extended grace | Retry 7 times over 14 days, flag for review before any enforcement |
+
+### 8.8 Degradation Policy API
+
+**Create a degradation policy:**
+
+```
+POST /api/v1/degradation-policies
+```
+
+Request body follows the policy template model (§8.1).
+
+**List policies:**
+
+```
+GET /api/v1/degradation-policies?trigger=balance_threshold
+```
+
+**Assign a policy to a tenant:**
+
+```
+POST /api/v1/degradation-policies/{policy_id}/assignments
+```
+
+```json
+{
+  "target_type": "tenant",
+  "target_id": "uuid",
+  "effective_date": "2026-07-01T00:00:00Z"
+}
+```
+
+**Get current degradation status for a tenant:**
+
+```
+GET /api/v1/tenants/{tenant_id}/degradation-status
+```
+
+Response:
+
+```json
+{
+  "tenant_id": "uuid",
+  "status": "throttled",
+  "active_stage": {
+    "name": "throttle",
+    "activated_at": "2026-07-15T14:30:00Z",
+    "condition_met_at": "2026-07-15T13:30:00Z",
+    "actions_executed": [
+      { "type": "notify", "executed_at": "2026-07-15T14:30:00Z", "status": "delivered" },
+      { "type": "enforce", "signal": "throttle", "executed_at": "2026-07-15T14:30:00Z", "status": "applied" }
+    ]
+  },
+  "policy_id": "uuid",
+  "policy_name": "Standard Prepaid Policy",
+  "recovery_conditions": {
+    "balance_required": 750.00,
+    "current_balance": 200.00,
+    "payment_status": "ok"
+  },
+  "history": [
+    { "stage": "warning", "entered_at": "2026-07-14T09:00:00Z", "exited_at": "2026-07-15T13:30:00Z" },
+    { "stage": "throttle", "entered_at": "2026-07-15T14:30:00Z", "exited_at": null }
+  ]
+}
+```
+
+**Force recovery (admin):**
+
+```
+POST /api/v1/tenants/{tenant_id}/degradation-status/recover
+```
+
+```json
+{
+  "reason": "Manual override — customer contacted support, payment pending",
+  "override_by": "admin@example.com"
+}
+```
+
+### 8.9 Webhook Events for Degradation Lifecycle
+
+| Event | Trigger |
+|-------|---------|
+| `degradation.stage_entered` | Tenant enters a new degradation stage |
+| `degradation.stage_exited` | Tenant exits a degradation stage (escalation or recovery) |
+| `degradation.enforcement_applied` | An enforcement signal was sent to Limitador or webhook |
+| `degradation.enforcement_lifted` | An enforcement signal was removed (recovery) |
+| `degradation.payment_retry` | A payment retry attempt was made |
+| `degradation.payment_retry_exhausted` | All retry attempts failed |
+| `degradation.recovered` | Tenant returned to normal operation |
+| `degradation.manual_override` | An administrator forced recovery or stage change |
+
+---
+
+## 9. API
+
+### 9.1 Credit Grants
 
 **Create a credit grant:**
 
@@ -528,7 +1016,7 @@ GET /api/v1/credits/grants?tenant_id={uuid}&status=active
 POST /api/v1/credits/grants/{grant_id}/void
 ```
 
-### 8.2 Credit Balance
+### 9.2 Credit Balance
 
 **Get real-time balance:**
 
@@ -554,7 +1042,7 @@ Response:
 }
 ```
 
-### 8.3 Credit Transactions
+### 9.3 Credit Transactions
 
 **Get transaction ledger:**
 
@@ -564,7 +1052,7 @@ GET /api/v1/credits/transactions?tenant_id={uuid}&type=consumption&start_date=20
 
 Response includes paginated ledger entries with running balance.
 
-### 8.4 Spend Simulation
+### 9.4 Spend Simulation
 
 **Simulate spend against a usage forecast:**
 
@@ -599,7 +1087,7 @@ Response:
 }
 ```
 
-### 8.5 Webhook Events
+### 9.5 Webhook Events
 
 | Event | Trigger |
 |-------|---------|
@@ -614,12 +1102,17 @@ Response:
 | `contract.true_up` | True-up invoice generated |
 | `budget.warning` | Budget threshold crossed |
 | `budget.exceeded` | Budget fully consumed |
+| `degradation.stage_entered` | Tenant enters a new degradation stage |
+| `degradation.stage_exited` | Tenant exits a degradation stage (escalation or recovery) |
+| `degradation.enforcement_applied` | Enforcement signal sent to Limitador or webhook |
+| `degradation.enforcement_lifted` | Enforcement signal removed (recovery) |
+| `degradation.recovered` | Tenant returned to normal operation |
 
 ---
 
-## 9. Integration with Block Runtime
+## 10. Integration with Block Runtime
 
-### 9.1 Balance-Check Block
+### 10.1 Balance-Check Block
 
 The Meteridian block runtime (METR-0002) processes usage events through a pipeline
 of blocks. The credit system introduces a **balance-check block** that is inserted
@@ -641,7 +1134,7 @@ throughput, multiple events may read the same balance concurrently. Valkey's ato
 `DECRBY` ensures correctness — if the decrement would result in a negative balance
 (hard cap mode), the operation is rejected and the event is retried or failed.
 
-### 9.2 Atomic Balance Updates
+### 10.2 Atomic Balance Updates
 
 All balance mutations use Valkey `MULTI/EXEC` transactions:
 
@@ -671,7 +1164,7 @@ redis.call('DECRBY', KEYS[2], tonumber(ARGV[1]) - remaining_cost)
 return remaining_cost
 ```
 
-### 9.3 Reconciliation
+### 10.3 Reconciliation
 
 Despite Valkey's atomicity guarantees, the real-time balance can drift from the
 ledger under edge conditions (network partitions, Valkey failover, application
@@ -691,9 +1184,9 @@ lock via Valkey `SET NX`).
 
 ---
 
-## 10. Open Questions
+## 11. Open Questions
 
-### 10.1 Grant Immutability
+### 11.1 Grant Immutability
 
 Should credit grants be strictly immutable (append-only ledger with no modifications
 to existing grants), or should administrative corrections be allowed (e.g., adjusting
@@ -709,7 +1202,7 @@ audit model.
 Current leaning: Option A (strict immutability) for the initial implementation, with
 adjustment transactions as the correction mechanism.
 
-### 10.2 Partial Credit Consumption
+### 11.2 Partial Credit Consumption
 
 How should the system handle events where the credit cost exceeds the available
 balance in soft-cap mode?
@@ -721,7 +1214,7 @@ balance in soft-cap mode?
 - **Reject and re-rate**: The event is rejected, re-rated at overage rates, and
   billed as pay-as-you-go. Clean separation but adds latency.
 
-### 10.3 Multi-Currency Credit Pools
+### 11.3 Multi-Currency Credit Pools
 
 Should a tenant be able to hold credit grants in multiple currencies simultaneously?
 
@@ -731,7 +1224,7 @@ Should a tenant be able to hold credit grants in multiple currencies simultaneou
   appropriate pool based on the usage event's billing currency. More flexible but
   significantly more complex.
 
-### 10.4 Credit Fungibility Across Products
+### 11.4 Credit Fungibility Across Products
 
 Can credits granted for Product A be used to pay for Product B? This is particularly
 relevant for platform vendors that sell multiple products (e.g., compute and AI
@@ -745,7 +1238,7 @@ services under the same umbrella).
 
 ---
 
-## 11. References
+## 12. References
 
 ### Industry Credit Models
 

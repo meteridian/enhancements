@@ -35,12 +35,12 @@ infrastructure:
 
 | Category | Fully Met | Mostly Met | Partially Met | Not Addressed |
 |----------|-----------|------------|---------------|---------------|
-| Metering & Billing (9 reqs) | 5 | 1 | 3 | 0 |
+| Metering & Billing (9 reqs) | 6 | 1 | 2 | 0 |
 | GSLB (11 reqs) | 0 | 0 | 0 | 11 (out of scope) |
 | Orchestrator (12 reqs) | 0 | 0 | 1 | 11 (out of scope) |
 
-**Overall compliance (Metering & Billing scope only): 85%** (fully, mostly, or
-partially met by planned v1.0 capabilities, weighted). Up from 82% pre-revision.
+**Overall compliance (Metering & Billing scope only): 89%** (fully, mostly, or
+partially met by planned v1.0 capabilities, weighted). Up from 85% pre-revision.
 
 **Recommendation: CONDITIONAL YES (conditions largely satisfied)** — Meteridian
 can serve as the Commercial Control Plane for the AI Grid. The primary
@@ -286,22 +286,27 @@ webhook schema is still needed for non-RHOAI deployments.
 
 | Aspect | Assessment |
 |--------|-----------|
-| **Status** | **Partially Met** |
-| **Evidence** | ADR-0010 (Pluggable Payment Providers), METR-0004 (Credit Billing §3.4, §5) |
+| **Status** | **Fully Met** (revised 2026-06-19) |
+| **Evidence** | ADR-0010 (Pluggable Payment Providers), METR-0004 (Credit Billing §3.4, §5, §8) |
+
+> **2026-06-19 revision:** METR-0004 §8 (Graduated Degradation Policies) now
+> defines a complete configurable policy template system for graduated service
+> degradation: per-stage actions (notify, throttle, block, suspend), configurable
+> timing (grace periods, cooldowns), payment failure retry schedules, auto-recovery,
+> policy inheritance across account hierarchies, and Limitador enforcement
+> integration (METR-0011). Built-in policy templates ship for common scenarios
+> (prepaid-standard, enterprise-soft, payment-retry-standard). This closes the
+> previously identified gap.
 
 **Requirement breakdown:**
 
-| Sub-requirement | Meteridian Coverage | Gap |
-|-----------------|--------------------|----|
+| Sub-requirement | Meteridian Coverage | Reference |
+|-----------------|--------------------|-----------| 
 | PCI-Compliant Abstraction: Tokenized payment processing (Credit Card, ACH, Partner Line of Credit) | **Fully met.** ADR-0010 defines pluggable payment provider blocks. Stripe, Paddle, and Adyen integrations are planned for v1.0. PCI compliance is delegated to the payment provider (standard industry practice — no billing platform handles raw card data). | ADR-0010 |
 | Happy Path Replenishment: Auto-reload prepaid wallet when balance hits floor | **Fully met.** METR-0004 §5 (Prepaid Balance Management) defines auto-replenishment triggers. When balance crosses a configured floor, the system initiates a charge against the stored payment method. | METR-0004 §5 |
-| Rainy Day Degradation: Graduated response to payment failures (warning → throttle → block) | **Partially met.** The graduated degradation logic (warning state, admin alerts, traffic throttling, hard block) is architecturally supported through the credit system's cap configurations (METR-0004 §3.4, soft cap vs hard cap). **However:** The specific graduated response sequence (warning → alert → throttle → block with timing) is not yet codified as a configurable policy template. | Need configurable degradation policy template |
+| Rainy Day Degradation: Graduated response to payment failures (warning → throttle → block) | **Fully met.** METR-0004 §8 defines graduated degradation policies as configurable templates with ordered stages, per-stage actions (notification, enforcement, administrative), grace periods, cooldowns, payment failure retry schedules, auto-recovery with flap prevention, and policy inheritance through the account hierarchy. Built-in templates cover standard prepaid, strict prepaid, enterprise soft-enforcement, and payment retry scenarios. Enforcement signals integrate with Limitador (METR-0011) for RHOAI deployments and with webhooks for other environments. | METR-0004 §8 |
 
-**Gap:** Auto-reload and PCI delegation are covered. The graduated degradation
-workflow (specific timing, alert channels, throttle levels) needs a policy
-configuration model.
-
-**Effort:** Minor extension — degradation policy configuration (~2-3 weeks).
+**Gap:** None.
 
 ---
 
@@ -395,7 +400,7 @@ billing control-plane actions only, not DNS/routing control-plane actions.
 | MB-004 | Hierarchical Account & Policy Topology | ✅ **Fully Met** | — |
 | MB-005 | Hybrid Consumption & Billing Models | ✅ **Fully Met** | — |
 | MB-006 | Real-Time Guardrails & Enforcement | ⚠️ **Partially Met** | Minor (~1 week) — Limitador enforcement integration (shared with MB-002) |
-| MB-007 | Secure Payment Lifecycle Management | ⚠️ **Partially Met** | Minor (2-3 weeks) — degradation policy template |
+| MB-007 | Secure Payment Lifecycle Management | ✅ **Fully Met** | — |
 | MB-008 | Core Platform Security & Access Control | ✅ **Fully Met** | — |
 | MB-009 | Reconciliation, Auditing & Dispute Tracing | ✅ **Fully Met** | — |
 
@@ -521,19 +526,12 @@ block would need to handle multiple inference API response formats.
 API format (e.g., OpenAI-compatible), with a roadmap item for additional
 formats.
 
-### 5. Graduated Payment Degradation Not Templated (MB-007)
+### 5. ~~Graduated Payment Degradation Not Templated (MB-007)~~ — CLOSED
 
-**Impact:** Low — the prospect notes this is a "billing system" responsibility
-and accepts external handling.
-
-The specific graduated response workflow (warning → alert → throttle → block
-with configurable timing at each step) is architecturally supported but not
-packaged as a configurable policy template. An operator would need to
-implement this logic using the credit system's cap configurations and webhook
-triggers.
-
-**Mitigation:** Create a "payment degradation policy" configuration template
-(~2-3 weeks).
+> **2026-06-19:** This gap has been closed. METR-0004 §8 (Graduated
+> Degradation Policies) now provides a complete configurable policy template
+> system with built-in templates for common scenarios, payment failure retry
+> schedules, auto-recovery, and Limitador enforcement integration.
 
 ---
 
@@ -577,22 +575,27 @@ Meteridian can serve as the Commercial Control Plane for the AI Grid PoC,
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| Fully Met | 5 | 56% |
+| Fully Met | 6 | 67% |
 | Mostly Met | 1 | 11% |
-| Partially Met | 3 | 33% |
+| Partially Met | 2 | 22% |
 | Not Met | 0 | 0% |
 | **Total addressable** | **9** | **100% coverage (full or partial)** |
 
 **Weighted score (full = 1.0, mostly = 0.85, partial = 0.6):**
-(5 × 1.0 + 1 × 0.85 + 3 × 0.6) / 9 = **85%** (revised from 82%)
+(6 × 1.0 + 1 × 0.85 + 2 × 0.6) / 9 = **89%** (revised from 85%)
 
-> **2026-06-19:** MB-003 upgraded from "Partially Met" to "Mostly Met" due to
-> the MaaS external metering plugin eliminating the LLM parsing gap. MB-002 and
-> MB-006 effort estimates also reduced due to Limitador providing a natural
-> enforcement integration point.
+> **2026-06-19 (latest):** MB-007 upgraded from "Partially Met" to "Fully Met"
+> due to METR-0004 §8 (Graduated Degradation Policies) providing configurable
+> policy templates with payment failure retry schedules, auto-recovery, and
+> Limitador enforcement integration.
+>
+> **2026-06-19 (earlier):** MB-003 upgraded from "Partially Met" to "Mostly Met"
+> due to the MaaS external metering plugin eliminating the LLM parsing gap.
+> MB-002 and MB-006 effort estimates also reduced due to Limitador providing a
+> natural enforcement integration point.
 
-**Including effort-to-close:** All remaining gaps are closable within 2-4 weeks
-of focused development (revised from 4-8 weeks). After gap closure: **100%**.
+**Including effort-to-close:** All remaining gaps are closable within 1-2 weeks
+of focused development (revised from 2-4 weeks). After gap closure: **100%**.
 
 ---
 
@@ -606,7 +609,7 @@ of focused development (revised from 4-8 weeks). After gap closure: **100%**.
 | MB-004 | METR-0005 | — | v1.0 |
 | MB-005 | METR-0003, METR-0004 | ADR-0003 | v1.0 |
 | MB-006 | METR-0004, **METR-0010** | ADR-0002 | v1.0 (partial — Limitador integration) |
-| MB-007 | METR-0004 | ADR-0010 | v1.0 (partial) |
+| MB-007 | METR-0004 (§8) | ADR-0010 | v1.0 |
 | MB-008 | METR-0008 | ADR-0017 | v1.0 |
 | MB-009 | METR-0008 | ADR-0014 | v1.0 |
 | ORCH-012 | METR-0004, METR-0005 | — | v1.0 (partial) |

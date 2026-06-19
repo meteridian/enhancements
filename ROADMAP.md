@@ -68,6 +68,7 @@ Target: First usable release with core metering, rating, and billing.
 - Go SDK and gRPC/Arrow Flight block runtimes (no WASM)
 - Product catalog with plans, charges, tiers, and multi-currency price books
 - Credit grants, prepaid balances, committed spend contracts
+- Graduated degradation policies with configurable stages, enforcement integration, and auto-recovery (METR-0004 §8)
 - Internal budget unit economy for chargeback and showback
 - Redpanda Connect for data collection (layer 1)
 - Block runtime for billing processing (layer 2)

@@ -331,9 +331,6 @@ to a global telco sovereign cloud.
   FOCUS v1.4 format to S3 nightly so that our FinOps platform (CloudHealth,
   Apptio, Vantage) can consume it without custom ETL.
 
-- **US-025:** As a telco BSS team, I want Meteridian to expose TM Forum TMF635
-  (Usage Management) API so it integrates with our existing OSS/BSS stack
-  without custom adapters.
 
 ---
 

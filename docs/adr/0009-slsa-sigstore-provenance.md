@@ -88,7 +88,7 @@ with a security warning).
 ### Positive
 
 - **Keyless signing eliminates developer friction**: Developers sign blocks
-  using their existing GitHub/Google/Microsoft identities. No GPG key
+  using their existing GitHub, Google, or Microsoft identities. No GPG key
   generation, no key distribution, no key rotation ceremonies. This removes
   the single biggest barrier to signed software: key management.
 

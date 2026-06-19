@@ -34,10 +34,19 @@ ADRs document significant architectural decisions, including the context, decisi
 | [ADR-0012](0012-tenant-isolated-batches.md) | Tenant-isolated event batches | Accepted |
 | [ADR-0013](0013-two-layer-data-architecture.md) | Two-layer data architecture (Redpanda Connect + block runtime) | Accepted |
 
+### Compliance and E-Invoicing
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| [ADR-0014](0014-cryptographic-audit-trail.md) | Cryptographic audit trail (hash chains + external anchoring) | Accepted |
+| [ADR-0015](0015-compliance-policy-engine.md) | Compliance policy engine (embedded OPA/Rego) | Accepted |
+| [ADR-0016](0016-einvoice-canonical-model.md) | E-invoice canonical model (EN 16931) | Accepted |
+| [ADR-0017](0017-fedramp-boundary-architecture.md) | FedRAMP boundary architecture and sovereign cloud deployment | Accepted |
+
 ## Creating New ADRs
 
 1. Copy the template from any existing ADR
-2. Number sequentially (next: ADR-0014)
+2. Number sequentially (next: ADR-0018)
 3. Use kebab-case filenames: `NNNN-short-title.md`
 4. Set status to `Proposed` until reviewed, then `Accepted`
 5. Never delete or renumber ADRs; supersede with a new one

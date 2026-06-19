@@ -5,7 +5,7 @@
 - **Created:** 2026-06-18
 - **Last Updated:** 2026-06-18
 - **Depends on:** METR-0001 (Platform Architecture)
-- **Related:** METR-0003 (Product Catalog), METR-0004 (Credit/Token Billing), METR-0005 (Internal Budget Units), METR-0006 (Developer Experience)
+- **Related:** METR-0003 (Product Catalog), METR-0004 (Credit and Token Billing), METR-0005 (Internal Budget Units), METR-0006 (Developer Experience), METR-0007 (Legal and Regulatory Compliance), METR-0008 (Compliance-as-Code), METR-0009 (E-Invoicing Engine)
 
 ---
 

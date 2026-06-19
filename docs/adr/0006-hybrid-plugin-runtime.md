@@ -33,14 +33,14 @@ conflicting requirements:
 
 A single runtime model cannot satisfy all three use cases. An in-process model
 (like Go plugins) provides performance but no isolation. A WASM-only model
-provides isolation but excludes Python/Java ecosystems. A gRPC-only model
+provides isolation but excludes Python and Java ecosystems. A gRPC-only model
 provides language flexibility but adds unnecessary latency for core blocks.
 
 ## Decision
 
 Meteridian provides **three runtime models**, phased over two releases, that
 share a single logical interface (receive Arrow RecordBatches, process, emit
-Arrow RecordBatches). The choice of runtime determines the performance/isolation
+Arrow RecordBatches). The choice of runtime determines the performance and isolation
 trade-off.
 
 ### Phase 1 (v1.0): Go SDK + gRPC (Arrow Flight)
@@ -98,7 +98,7 @@ WASM is deferred to v2 because:
 
 All runtimes implement the same block interface. A pipeline can mix blocks from
 different runtimes without any changes to the pipeline definition. The platform
-handles the serialization/transport differences transparently. A block written
+handles the serialization and transport differences transparently. A block written
 for gRPC in v1 will continue to work in v2 without changes; WASM is additive.
 
 ## Consequences
@@ -114,8 +114,8 @@ for gRPC in v1 will continue to work in v2 without changes; WASM is additive.
   Go SDK (Tier 3) if adopted into the core platform. The migration path is
   clear because the logical interface is identical across runtimes.
 
-- **Broad language support**: Go (SDK), Rust/TinyGo/C/AssemblyScript/Zig (WASM),
-  Python/Java/Node.js/Ruby/C++ (gRPC). This covers virtually every language
+- **Broad language support**: Go (SDK), Rust, TinyGo, C, AssemblyScript, and Zig (WASM),
+  Python, Java, Node.js, Ruby, and C++ (gRPC). This covers virtually every language
   used in cloud-native development and data engineering.
 
 - **Incremental adoption**: New runtimes can be added in the future (e.g., a
@@ -181,7 +181,7 @@ HTTP clients, and full Go stdlib cannot run in WASM. Additionally, Python and
 Java do not have production-quality WASM targets with full library support
 (no PyArrow in WASM, no JVM in WASM). A WASM-only model would exclude the
 most important languages for both core development (Go) and data science
-(Python/Java).
+(Python and Java).
 
 ### WASM from Day One (v1)
 
@@ -223,7 +223,7 @@ access to the host process. The ABI compatibility requirement alone makes
 plugins impractical for a marketplace where block authors use different Go
 versions and dependency trees.
 
-### Lua / JavaScript Embedding
+### Lua and JavaScript Embedding
 
 Embedding a scripting language (Lua via GopherLua, JavaScript via V8/Goja) for
 lightweight blocks.

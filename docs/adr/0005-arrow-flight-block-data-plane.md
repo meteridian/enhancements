@@ -13,7 +13,7 @@ between processing blocks, and (2) the in-memory representation for event
 payloads within blocks.
 
 The initial design proposed a dual-format approach: Protocol Buffers (Protobuf)
-for RPC envelope/control messages and Apache Arrow for columnar event data, with
+for RPC envelope and control messages and Apache Arrow for columnar event data, with
 developers managing both schema languages. This was rejected as unnecessarily
 complex for block authors.
 

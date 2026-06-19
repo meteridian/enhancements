@@ -74,7 +74,7 @@ and A2A operate on -- it is a view, not the source of truth.
 The Kubernaut `apifrontend` package provides a proven blueprint:
 
 - **`router.go`**: HTTP router with health, metrics, agent card, and authenticated
-  MCP/A2A endpoints, applying middleware (auth, CORS, audit logging)
+  MCP and A2A endpoints, applying middleware (auth, CORS, audit logging)
 - **`mcp.go`**: `NewMCPHandler` using `github.com/modelcontextprotocol/go-sdk/mcp`
   for the MCP Streamable HTTP protocol
 - **`agentcard.go`**: A2A agent card using `github.com/a2aproject/a2a-go/a2a`,
@@ -82,7 +82,7 @@ The Kubernaut `apifrontend` package provides a proven blueprint:
 - **`mcptools.go`**: `mcpToolRegistry` as the centralized tool definition list
 
 Meteridian will adapt this pattern, replacing Kubernaut's Kubernetes-focused tools
-with metering/billing-focused tools.
+with metering and billing-focused tools.
 
 ## Consequences
 
@@ -101,7 +101,7 @@ with metering/billing-focused tools.
 
 ### Negative
 
-- **AI dependency**: Users without AI assistant access must use YAML/CLI directly
+- **AI dependency**: Users without AI assistant access must use YAML or CLI directly
   (adequate for developers, but less accessible for business users)
 - **Protocol maturity**: MCP and A2A are young protocols (2024-2025); breaking
   changes are possible
@@ -117,7 +117,7 @@ with metering/billing-focused tools.
 
 ## Alternatives Considered
 
-### Visual Editor First (Node-RED / NiFi Style)
+### Visual Editor First (Node-RED and NiFi Style)
 
 A drag-and-drop canvas UI for pipeline design. Intuitive for simple pipelines and
 non-technical users.

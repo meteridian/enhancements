@@ -36,6 +36,9 @@ Target: First usable release with core metering, rating, and billing.
 | [METR-0004](enhancements/0004-credit-token-billing/credit-token-billing.md) | Credit, Prepaid, and Token-Based Billing | provisional |
 | [METR-0005](enhancements/0005-internal-token-economy/internal-token-economy.md) | Internal Budget Units and Chargeback | provisional |
 | [METR-0006](enhancements/0006-developer-experience/developer-experience.md) | Developer Experience and Tooling | provisional |
+| [METR-0007](enhancements/0007-legal-regulatory-compliance/legal-regulatory-compliance.md) | Legal and Regulatory Compliance Framework | draft |
+| [METR-0008](enhancements/0008-compliance-as-code/compliance-as-code.md) | Compliance-as-Code and Audit Trail Guarantees | draft |
+| [METR-0009](enhancements/0009-e-invoicing-engine/e-invoicing-engine.md) | Native E-Invoicing Engine | draft |
 
 ### Key Decisions (ADRs)
 
@@ -54,24 +57,36 @@ Target: First usable release with core metering, rating, and billing.
 | [ADR-0011](docs/adr/0011-at-least-once-idempotency.md) | At-least-once + idempotency keys | Accepted |
 | [ADR-0012](docs/adr/0012-tenant-isolated-batches.md) | Tenant-isolated event batches | Accepted |
 | [ADR-0013](docs/adr/0013-two-layer-data-architecture.md) | Two-layer data architecture (Redpanda Connect + block runtime) | Accepted |
+| [ADR-0014](docs/adr/0014-cryptographic-audit-trail.md) | Cryptographic audit trail (hash chains + external anchoring) | Accepted |
+| [ADR-0015](docs/adr/0015-compliance-policy-engine.md) | Compliance policy engine (embedded OPA/Rego) | Accepted |
+| [ADR-0016](docs/adr/0016-einvoice-canonical-model.md) | E-invoice canonical model (EN 16931) | Accepted |
+| [ADR-0017](docs/adr/0017-fedramp-boundary-architecture.md) | FedRAMP boundary architecture and sovereign cloud deployment | Accepted |
 
 ### v1.0 Scope
 
 - Go SDK and gRPC/Arrow Flight block runtimes (no WASM)
 - Product catalog with plans, charges, tiers, and multi-currency price books
 - Credit grants, prepaid balances, committed spend contracts
-- Internal token economy for chargeback/showback
+- Internal budget unit economy for chargeback and showback
 - Redpanda Connect for data collection (layer 1)
 - Block runtime for billing processing (layer 2)
 - MCP server and A2A endpoint for AI-first extensibility
 - CLI and local emulator for block development
 - Marketplace with SLSA/Sigstore provenance (Tier 0-2 blocks via gRPC)
 - OCP, AWS, Azure, GCP provider support
+- Immutable audit trail with cryptographic hash chains (METR-0008, ADR-0014)
+- Sequential invoice numbering with gap detection
+- PII separation and selective erasure (GDPR-compatible data model)
+- Canonical e-invoice model based on EN 16931 (METR-0009, ADR-0016)
+- UBL 2.1 and Factur-X format generators
+- Avalara tax engine integration block
+- Built-in multi-rate VAT/GST calculator for air-gapped deployment
+- SOC 2-aligned logging and evidence collection
 
 ### v1.0 Explicitly Excluded
 
 - WASM runtime (deferred to v2, see ADR-0006)
-- DePIN/blockchain tokenomics (deferred to v2, see below)
+- DePIN and blockchain tokenomics (deferred to v2, see below)
 - Visual pipeline editor (deferred, AI-first approach covers this)
 - Bin-packing optimization for same-tenant batches (deferred, see ADR-0012)
 
@@ -91,13 +106,29 @@ Target: Marketplace maturity, advanced features, broader ecosystem.
 | METR-TBD | Multi-Region Federation | planned | Catalog sync, event routing, data residency enforcement |
 | METR-TBD | Advanced Fraud Detection | planned | ML-based anomaly detection blocks for revenue assurance |
 
+### v1.x Compliance and E-Invoicing Expansion (from METR-0008 and METR-0009)
+
+| Capability | Source | Notes |
+|-----------|--------|-------|
+| OPA-based compliance policy engine | METR-0008 / ADR-0015 | Inline and continuous evaluation of regulatory policies |
+| GDPR, SOX, GoBD regulatory rule sets | METR-0008 | Pre-built policy bundles for major jurisdictions |
+| Data subject rights API (access, erasure, portability) | METR-0008 | GDPR Art. 15-22 implementation |
+| SOC 2 evidence collector and ISO 27001 artifact generator | METR-0008 | Automated compliance reporting |
+| GoBD and FEC audit export blocks | METR-0008 | German and French audit export formats |
+| XML-DSig, XAdES, ZATCA CSID digital signing | METR-0009 | Jurisdiction-specific cryptographic signing |
+| SEFAZ, IRP, ZATCA tax authority connectors | METR-0009 | Brazil, India, Saudi Arabia clearance |
+| NF-e, CFDI 4.0, India GST format generators | METR-0009 | Jurisdiction-specific e-invoice formats |
+| Peppol Access Point integration | METR-0009 | EU, AU, and SG e-invoice delivery |
+| HSM and KMS integration (PKCS#11, cloud KMS) | METR-0009 | Production key management |
+| FedRAMP continuous monitoring artifacts | ADR-0017 | NIST 800-53 control mapping |
+
 ### Planned METRs and ADRs
 
 | ID | Title | Type | Notes |
 |----|-------|------|-------|
 | METR-TBD | Multi-Tenancy and Authorization | METR | Tenant isolation model, OpenFGA/Zanzibar vs RBAC, API-level access control. Prerequisite for production deployment. |
-| ADR-0014 | Authorization Model | ADR | Choice of authorization engine (OpenFGA, SpiceDB, or custom), tenant isolation guarantees, integration with block security model. |
-| ADR-0015 | Backup and Disaster Recovery Strategy | ADR | RPO/RTO targets, TimescaleDB continuous archiving, Valkey persistence, cross-region replication strategy. |
+| ADR-TBD | Authorization Model | ADR | Choice of authorization engine (OpenFGA, SpiceDB, or custom), tenant isolation guarantees, integration with block security model. |
+| ADR-TBD | Backup and Disaster Recovery Strategy | ADR | RPO and RTO targets, TimescaleDB continuous archiving, Valkey persistence, cross-region replication strategy. |
 | ADR-TBD | Arrow IPC over WASM shared memory | ADR | Validate zero-copy feasibility before committing to WASM runtime |
 | ADR-TBD | WASI Preview 2 readiness assessment | ADR | Gate WASM launch on WASI stability |
 | ADR-TBD | Multi-region catalog consistency | ADR | Eventual vs. strong consistency trade-offs |
@@ -137,7 +168,7 @@ typically involves:
    these is a major project in itself.
 3. **Market validation**: The DePIN market is nascent. We need to validate
    demand with actual customers before investing.
-4. **Dimension 1 and 2 first**: Credit/prepaid billing and internal token
+4. **Dimension 1 and 2 first**: Credit and prepaid billing and internal budget unit
    economy serve much larger markets today and share foundational
    infrastructure (balance management, ledger, credit grants) with DePIN.
 
@@ -152,7 +183,7 @@ typically involves:
 
 - When we have a concrete customer request for DePIN metering
 - When regulatory frameworks (MiCA in EU, US stablecoin legislation) stabilize
-- After v1 launch, with real production data on credit/prepaid workloads
+- After v1 launch, with real production data on credit and prepaid workloads
 
 ---
 
@@ -187,7 +218,7 @@ v1 ships with Go SDK and Python SDK. Additional SDKs are planned:
 | Language | Priority | Rationale |
 |----------|----------|-----------|
 | Rust | High | Systems programming, WASM compilation target (v2) |
-| TypeScript/Node.js | Medium | Web developer audience, lightweight blocks |
+| TypeScript and Node.js | Medium | Web developer audience, lightweight blocks |
 | Java | Medium | Enterprise ecosystem, Kafka integration |
 | C# | Low | .NET ecosystem |
 
@@ -203,6 +234,6 @@ To add items to this roadmap:
 1. **New enhancement:** Create a METR document in `enhancements/NNNN-short-name/`
 2. **New decision:** Create an ADR in `docs/adr/NNNN-short-name.md`
 3. **Deferred item:** Add a section to this file under the appropriate phase
-4. **Implementation task:** Create a GitHub Issue linking to the relevant METR/ADR
+4. **Implementation task:** Create a GitHub Issue linking to the relevant METR or ADR
 
 Keep this file updated as METRs and ADRs are created, accepted, or superseded.

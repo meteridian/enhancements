@@ -138,7 +138,7 @@ in the observability stack.
 
 ## Alternatives Considered
 
-### Webhooks / Event Subscriptions
+### Webhooks and Event Subscriptions
 
 The industry standard: users subscribe to events (e.g., `invoice.created`,
 `usage.recorded`) and receive HTTP POST callbacks at their own endpoints.
@@ -156,7 +156,7 @@ with geolocation, apply tiered pricing, and route to the correct payment
 provider"). Meteridian will still support webhooks as a specific sink block
 type for backward compatibility, but webhooks are not the extensibility model.
 
-### Middleware Chain (Express/Django Style)
+### Middleware Chain (Express and Django Style)
 
 A linear chain of middleware functions, each of which can modify the request
 and pass it to the next middleware. Used by Express.js, Django, and many web
@@ -170,7 +170,7 @@ chain cannot express these topologies. Additionally, middleware chains are
 tightly coupled to the request/response pattern, which doesn't fit
 stream-oriented metering data.
 
-### Stored Procedures / User-Defined Functions (UDFs)
+### Stored Procedures and User-Defined Functions (UDFs)
 
 Allowing users to define custom SQL functions or stored procedures that run
 inside the database (TimescaleDB).

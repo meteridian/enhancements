@@ -8,9 +8,12 @@ metering and rating platform for hybrid infrastructure.
 
 Meteridian is a metering, rating, and cost management platform that covers the
 full spectrum of infrastructure: Kubernetes, bare metal, hypervisors, cloud
-providers, network devices, mainframes, OpenStack, and AI/ML workloads. It
-provides telco-grade rating accuracy with real-time balance management, and
-deploys on-premises or in the cloud.
+providers (AWS, Azure, GCP, IBM Cloud, Oracle Cloud, Alibaba Cloud, Huawei
+Cloud), network devices, mainframes, OpenStack, AI and ML workloads, and SaaS
+services. It supports the FOCUS v1.4 standard for vendor-neutral cost data
+interchange, enabling ingestion from any provider that exports FOCUS-format
+billing data. It provides telco-grade rating accuracy with real-time balance
+management, and deploys on-premises or in the cloud.
 
 ## Repository Structure
 

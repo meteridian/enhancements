@@ -607,32 +607,19 @@ into optimization recommendations. No metering platform has this.
 
 ### Competition Summary
 
-```
-                        Self-Hosted
-                            ^
-                            |
-              Meteridian    |
-              ****          |
-             *    *         |
-            *      *        |
-    Lago   * OpenCost *     |    Kubecost
-      *   *          *     |      *
-           *        *      |
-            *      *       |
-   Infra ---|------*-------+------- SaaS/Cloud Only
-   Native   |      *      |
-            |       *     |    Metronome  Orb
-            |        *    |       *        *
-            |         *   |   Amberflo  CloudZero
-            |    Amdocs   |      Apptio
-            |      *      |        *
-            |             |    Vantage  CloudHealth
-            |             v
-                      SaaS-Only
-```
+![Meteridian Competitive Quadrant](meteridian-competitive-quadrant.png)
 
-Meteridian occupies the upper-left quadrant (self-hosted + infrastructure-native)
-where no competitor exists. The strategic play is to expand into SaaS and cloud
-billing (lower-right) via integrations with Lago and Stripe, while competitors
-cannot easily move into the upper-left because they lack infrastructure
-collectors and self-hosted architecture.
+Meteridian sits in the **Visionaries** quadrant with the broadest completeness of
+vision in the market -- open source, self-hosted, billing-grade metering with
+multi-cloud support, compliance-as-code, and a modular block architecture. Its
+trajectory targets the **Leaders** quadrant as execution matures. Established
+players like Zuora and Metronome lead on execution today but lack self-hosted
+deployment and infrastructure-native metering. Challengers (Apptio, Amdocs,
+CloudHealth) have strong market presence but narrower vision for the metering and
+rating space. Niche Players like OpenCost and Kubecost focus narrowly on Kubernetes
+cost allocation. Lightspeed CM has significant scope -- metering (usage and capacity),
+rating (custom rates in 40+ dimensions), cost allocation, resource
+optimization, and efficiency scores across OpenShift, KubeVirt,
+OpenShift AI, AWS, Azure, and GCP. It lacks billing capabilities
+(invoicing, payment collection, subscription management, credit and
+prepaid balances) which keeps it out of the Leaders quadrant.

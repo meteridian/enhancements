@@ -5,7 +5,7 @@
 - **Created:** 2026-06-18
 - **Last Updated:** 2026-06-18
 - **Depends on:** METR-0001 (Platform Architecture)
-- **Related:** METR-0002 (Extensibility), METR-0004 (Credit/Token Billing), METR-0005 (Internal Budget Units), METR-0006 (Developer Experience)
+- **Related:** METR-0002 (Extensibility), METR-0004 (Credit, Prepaid, and Token Billing), METR-0005 (Internal Budget Units), METR-0006 (Developer Experience)
 
 ---
 
@@ -157,8 +157,8 @@ responsibility:
 │  └─────┬─────┘                                                      │
 │        │ N:M                                                        │
 │  ┌─────▼─────────┐                                                  │
-│  │  Price Book    │  Currency/region-specific pricing.              │
-│  │  Entry         │  USD, EUR, GBP, JPY per charge/tier.           │
+│  │  Price Book    │  Currency- and region-specific pricing.              │
+│  │  Entry         │  USD, EUR, GBP, JPY per charge or tier.           │
 │  └───────────────┘                                                  │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -314,7 +314,7 @@ CREATE TABLE catalog.tiers (
     flat_fee        NUMERIC,                 -- for staircase model or flat fee per tier
     percentage      NUMERIC,                 -- for percentage model
     package_size    NUMERIC,                 -- for package model
-    ordinal         INT NOT NULL,            -- display/evaluation order
+    ordinal         INT NOT NULL,            -- display and evaluation order
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT valid_bounds CHECK (upper_bound IS NULL OR upper_bound > lower_bound),
@@ -1576,7 +1576,7 @@ multi-region deployment?
    YugabyteDB) for the catalog. Strong consistency but higher latency.
 
 **Current leaning:** Single-writer for v1. Most catalog changes are infrequent
-(pricing changes happen weekly/monthly, not per-second), so the latency of
+(pricing changes happen weekly or monthly, not per-second), so the latency of
 cross-region replication is acceptable.
 
 ### 12.3 Catalog Cache Granularity

@@ -4,12 +4,12 @@
 - **Authors:** @pgarciaq, @jordigilh
 - **Created:** 2026-06-18
 - **Last Updated:** 2026-06-18
-- **Depends on:** METR-0001 (Platform Architecture), METR-0003 (Product Catalog), METR-0004 (Credit/Prepaid Billing)
+- **Depends on:** METR-0001 (Platform Architecture), METR-0003 (Product Catalog), METR-0004 (Credit, Prepaid, and Token Billing)
 - **Related:** METR-0002 (Platform Extensibility)
 
 > **Terminology note:** This document uses "budget units" for internal
 > allocation units used in chargeback/showback. The term "tokens" is reserved
-> for blockchain/DePIN settlement (v2). See the
+> for blockchain and DePIN settlement (v2). See the
 > [README terminology table](../../README.md#terminology) for the full glossary.
 
 ---
@@ -50,7 +50,7 @@ This enhancement defines the data model for budget unit types, budget
 allocations, internal rate cards, chargeback/showback reporting, hierarchical
 account structures, and the optional internal marketplace. It builds on the
 credit system architecture defined in METR-0004 and generalizes the cost
-distribution patterns proven in Koku's platform/worker distribution model.
+distribution patterns proven in Koku's platform and worker distribution model.
 
 ---
 
@@ -99,7 +99,7 @@ An internal budget unit system provides:
 ### 2.4 Koku Heritage
 
 Koku already implements sophisticated cost distribution logic — platform cost
-distribution, worker unallocated distribution, storage/network/GPU overhead
+distribution, worker unallocated distribution, storage, network, and GPU overhead
 allocation. These patterns map directly to the internal budget unit model:
 
 | Koku Concept | Meteridian Generalization |
@@ -136,7 +136,7 @@ one or more budget unit types.
 **Examples:**
 
 - "Compute Credits" (1 USD = 100 CC): Used to track compute consumption.
-- "AI Units" (1 USD = 10 AIU): Higher-value units for GPU/ML workloads.
+- "AI Units" (1 USD = 10 AIU): Higher-value units for GPU and ML workloads.
 - "Platform Units" (1 USD = 1 PU): One-to-one mapping with currency for simplicity.
 
 Most organizations will define a single budget unit type for simplicity. Multiple budget
@@ -292,7 +292,7 @@ responsible team.
 - Kubernetes namespace → team mapping
 - Cloud provider tags (team, project, cost_center)
 - Application identifiers
-- User/service account ownership
+- User or service account ownership
 
 Direct allocation works well for resources that are exclusively owned by a single
 team. For shared resources, other allocation methods are needed.
@@ -317,8 +317,8 @@ This maps directly to Koku's existing distribution model:
 
 | Koku Distribution | Meteridian Equivalent |
 |---|---|
-| `platform_distributed` (by CPU/memory) | Shared cost distribution (blended) |
-| `worker_distributed` (by CPU/memory) | Idle resource allocation |
+| `platform_distributed` (by CPU and memory) | Shared cost distribution (blended) |
+| `worker_distributed` (by CPU and memory) | Idle resource allocation |
 | `unattributed_storage` | Shared storage distribution |
 | `unattributed_network` | Shared network distribution |
 | `gpu_distributed` | Specialized resource distribution |
@@ -471,7 +471,7 @@ When teams provide services to other teams (e.g., a data platform team providing
 a shared analytics service), transfer pricing determines the internal cost:
 
 - **Cost-based**: The providing team charges the consuming team at actual cost
-  (no profit/loss).
+  (no profit or loss).
 - **Market-based**: The providing team charges at market rates (comparable
   external service pricing). This tests whether internal services are competitive.
 - **Negotiated**: Teams negotiate a price, approved by management.
@@ -513,10 +513,10 @@ chargeback ledger and business metrics ingested via the usage event pipeline.
 
 Real-time dashboards compare allocated budgets against actual consumption:
 
-- **Burn rate**: Current consumption rate (budget units per day/hour).
+- **Burn rate**: Current consumption rate (budget units per day or hour).
 - **Projected spend**: Extrapolated end-of-period consumption.
 - **Budget utilization**: Percentage of budget consumed vs. elapsed time.
-- **Variance analysis**: Breakdown of over/under-budget by resource type.
+- **Variance analysis**: Breakdown of over- or under-budget by resource type.
 
 Dashboard data is served from pre-aggregated materialized views, updated in
 near-real-time (< 5 minute lag).
@@ -756,7 +756,7 @@ How should costs be allocated when multiple teams share a Kubernetes namespace?
 - **Proportional by pod count**: Divide namespace costs proportionally by the
   number of pods each team runs. Simple but ignores resource consumption
   differences.
-- **Proportional by resource consumption**: Divide by actual CPU/memory usage
+- **Proportional by resource consumption**: Divide by actual CPU and memory usage
   per team within the namespace. Most accurate but requires fine-grained metering.
 - **Ownership-based**: The namespace owner bears all costs, regardless of who
   runs pods in it. Simplest but may create perverse incentives.
@@ -765,7 +765,7 @@ How should costs be allocated when multiple teams share a Kubernetes namespace?
 
 Who should be able to set and modify internal rate cards?
 
-- **Centralized**: Finance/FinOps team sets rates for the entire organization.
+- **Centralized**: Finance and FinOps team sets rates for the entire organization.
   Ensures consistency but may not reflect local realities.
 - **Federated**: Each business unit can set its own rates within guardrails.
   More flexible but risks inconsistency.
@@ -804,7 +804,7 @@ fees, support charges), how should these be allocated retroactively?
 ### Existing Implementations
 
 - [Koku Cost Distribution Model](https://github.com/project-koku/koku) —
-  Platform/worker cost distribution, namespace-level cost allocation, and
+  Platform and worker cost distribution, namespace-level cost allocation, and
   OpenShift cost management. Meteridian generalizes these patterns.
 - [Apptio / IBM Turbonomic](https://www.ibm.com/products/turbonomic) —
   Enterprise IT financial management and cost optimization platform.

@@ -37,15 +37,18 @@ to a global telco sovereign cloud.
 | Category | Targets | Priority |
 |----------|---------|----------|
 | **Kubernetes** | OpenShift, vanilla K8s, EKS, AKS, GKE | Day 1 |
-| **Cloud providers** | AWS, Azure, GCP (cost data ingestion) | Day 1 |
+| **Cloud providers (Tier 1)** | AWS, Azure, GCP (cost data ingestion) | Day 1 |
+| **Cloud providers (Tier 2)** | IBM Cloud, Oracle Cloud, Alibaba Cloud, Huawei Cloud | Phase 2 |
+| **SaaS and AI providers** | OpenAI, Anthropic, Snowflake, Datadog, and others | Phase 2 |
+| **FOCUS data** | Any provider exporting FOCUS-compliant cost and usage data | Day 1 |
 | **Hypervisors** | KVM/libvirt, VMware vSphere/VCF | Day 1 |
 | **Hypervisors** | Hyper-V, Nutanix, Proxmox, oVirt, Harvester | Phase 2 |
 | **Hypervisors** | Xen/XCP-ng, Oracle VM, Scale Computing | Phase 3 |
 | **OpenStack** | RHOSO, Mirantis, Canonical, OpenStack-Helm | Day 1 |
 | **Bare metal** | IPMI/Redfish-enabled servers | Day 1 |
-| **Network devices** | SNMP, NetFlow/sFlow/IPFIX | Day 1 |
+| **Network devices** | SNMP, NetFlow, sFlow, IPFIX | Day 1 |
 | **Mainframes** | IBM Z (LPAR, IFL, zVM, CICS) | Phase 2 |
-| **AI/ML** | GPU clusters, LLM inference, training jobs | Day 1 |
+| **AI and ML** | GPU clusters, LLM inference, training jobs | Day 1 |
 | **Windows** | WMI/WinRM-based metering | Phase 2 |
 | **IBM POWER** | PowerVM, LPAR | Phase 3 |
 | **Oracle Exadata** | Database Machine metering | Phase 3 |

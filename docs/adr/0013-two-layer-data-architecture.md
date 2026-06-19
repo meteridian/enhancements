@@ -32,7 +32,7 @@ extensibility.
 Redpanda Connect (formerly Benthos) is a stream processing framework with a
 declarative YAML configuration language and 200+ connectors. It excels at
 protocol translation (Kafka→HTTP, S3→AMQP), format conversion (CSV→JSON→Parquet),
-fan-out/fan-in, content-based routing, and retry/error handling.
+fan-out/fan-in, content-based routing, and retry and error handling.
 
 RC does **not** have: financial precision types, tenant-aware processing, cost
 model evaluation, invoice generation, or stateful billing operations.

@@ -80,8 +80,8 @@ which require a real-time balance that decrements as resources are consumed.
 ### 2.4 Competitive Landscape
 
 Modern billing platforms (Orb, Metronome, Amberflo) all support some form of
-prepaid/credit billing. Stripe Billing recently added credit grants. Meteridian must
-match or exceed this functionality to be competitive in the metering/billing
+prepaid and credit billing. Stripe Billing recently added credit grants. Meteridian must
+match or exceed this functionality to be competitive in the metering and billing
 infrastructure market.
 
 ---
@@ -282,7 +282,7 @@ Rollover policies determine what happens to unused committed credits at period e
 - **`next_period`**: Unused credits carry forward to the next commitment period.
   The rolled-over amount is added to (not replacing) the next period's commitment.
 - **`end_of_contract`**: Unused credits accumulate and are available until the
-  contract ends. Credits are only forfeited/true-up'd at contract termination.
+  contract ends. Credits are only forfeited or true-up'd at contract termination.
 
 Rollover is capped by configurable limits (e.g., max rollover of 25% of the
 period's commitment) to prevent unbounded accumulation.

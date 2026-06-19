@@ -8,11 +8,14 @@
 **Revision Note:** Updated to reflect RHOAI MaaS external metering plugin
 ([PR #320][ipp-pr-320], [RHAISTRAT-1919][rhaistrat-1919]) and Red Hat
 Connectivity Link (Authorino + Limitador). See [METR-0010 §3][metr-0010-s3]
-for full details.
+for full details. Further updated to reflect the closed-loop enforcement
+integration design ([METR-0011][metr-0011], [ADR-0018][adr-0018]).
 
 [ipp-pr-320]: https://github.com/opendatahub-io/ai-gateway-payload-processing/pull/320
 [rhaistrat-1919]: https://redhat.atlassian.net/browse/RHAISTRAT-1919
 [metr-0010-s3]: ../../enhancements/0010-ai-metering/ai-metering.md#3-rhoai-maas-external-metering-plugin--primary-data-source
+[metr-0011]: ../../enhancements/0011-enforcement-integration/enforcement-integration.md
+[adr-0018]: ../../docs/adr/0018-closed-loop-enforcement-limitador.md
 
 ---
 
@@ -35,12 +38,13 @@ infrastructure:
 
 | Category | Fully Met | Mostly Met | Partially Met | Not Addressed |
 |----------|-----------|------------|---------------|---------------|
-| Metering & Billing (9 reqs) | 5 | 1 | 3 | 0 |
+| Metering & Billing (9 reqs) | 5 | 3 | 1 | 0 |
 | GSLB (11 reqs) | 0 | 0 | 0 | 11 (out of scope) |
 | Orchestrator (12 reqs) | 0 | 0 | 1 | 11 (out of scope) |
 
-**Overall compliance (Metering & Billing scope only): 85%** (fully, mostly, or
-partially met by planned v1.0 capabilities, weighted). Up from 82% pre-revision.
+**Overall compliance (Metering & Billing scope only): 92%** (fully, mostly, or
+partially met by planned v1.0 capabilities, weighted). Up from 85% in the
+prior revision and 82% in the original analysis.
 
 **Recommendation: CONDITIONAL YES (conditions largely satisfied)** — Meteridian
 can serve as the Commercial Control Plane for the AI Grid. The primary
@@ -141,8 +145,8 @@ hybrid infrastructure. It provides:
 
 | Aspect | Assessment |
 |--------|-----------|
-| **Status** | **Partially Met** |
-| **Evidence** | METR-0004 (Credit Billing), METR-0005 (Internal Budget Units), METR-0003 (Product Catalog) |
+| **Status** | **Mostly Met** (revised 2026-06-19 — see METR-0011) |
+| **Evidence** | METR-0004 (Credit Billing), METR-0005 (Internal Budget Units), METR-0003 (Product Catalog), [METR-0011][metr-0011] (Enforcement Integration), [ADR-0018][adr-0018] |
 
 **Requirement breakdown:**
 
@@ -164,10 +168,26 @@ be developed as a custom block or integration.
 > update Limitador quota counters via its API based on billing state (balance
 > exhausted → set quota to 0; throttle → reduce quota). This is a
 > well-defined integration contract, not a bespoke orchestrator hook.
+>
+> **2026-06-19 enforcement design revision:** [METR-0011][metr-0011] now
+> defines a complete **closed-loop enforcement architecture** with dual-path
+> defense-in-depth ([ADR-0018][adr-0018]):
+>
+> - **Path A (pull):** Meteridian serves as the MaaS plugin's balance-check
+>   backend. Every inference request is checked against current balance
+>   (~3-8ms latency, per-request accuracy).
+> - **Path B (push):** On threshold crossings, Meteridian pushes enforcement
+>   signals to Limitador's HTTP API (~1-5s latency, proactive enforcement).
+>
+> Together, these ensure enforcement survives any single component failure.
+> This upgrades the assessment from "Partially Met" to **"Mostly Met"** —
+> the remaining gap is only the account lifecycle sync with RHOAI user
+> management (not enforcement).
 
-**Effort:** Minor extension — Limitador quota integration (~1-2 weeks, revised
-from 2-4 weeks). The integration is simpler than originally assessed because
-Limitador already exists in the gateway pipeline and has a standard API.
+**Effort:** ~2 weeks total — Balance Check API endpoint (2-3 days) + Limitador
+push integration (2-3 days) + threshold configuration and testing (3-4 days).
+Revised down from the prior estimate of 1-2 weeks because the detailed design
+in METR-0011 reduces ambiguity.
 
 ---
 
@@ -252,8 +272,8 @@ pre-built "SLA-aware rating rule" template exists yet.
 
 | Aspect | Assessment |
 |--------|-----------|
-| **Status** | **Partially Met** |
-| **Evidence** | METR-0004 (Credit Billing §3.4, §7), METR-0005 (Internal Budget Units §3.3) |
+| **Status** | **Mostly Met** (revised 2026-06-19 — see METR-0011) |
+| **Evidence** | METR-0004 (Credit Billing §3.4, §7), METR-0005 (Internal Budget Units §3.3), [METR-0011][metr-0011] (Enforcement Integration), [ADR-0018][adr-0018] |
 
 **Requirement breakdown:**
 
@@ -261,7 +281,7 @@ pre-built "SLA-aware rating rule" template exists yet.
 |-----------------|--------------------|----|
 | Edge Convergence Rate: Reconcile distributed edge logs in under 60 seconds | **Fully met.** Credit consumption is immediate (Valkey update is synchronous during event processing, METR-0004 §3.4). Balance reads are sub-millisecond. Edge convergence is bounded by event delivery latency from the edge, not by Meteridian's processing time. | — |
 | Automated Notification Triggers: Webhooks when usage crosses 50%, 75%, 90% thresholds | **Fully met.** Bill Shock Prevention (METR-0004 §7) explicitly supports configurable threshold alerts with webhook delivery. | METR-0004 §7 |
-| Enforcement Signals: Machine-readable directives to orchestrator (top-up, throttle, downgrade, block) | **Partially met.** Meteridian can emit enforcement signals as webhook events or through its API. The signal types (throttle, downgrade, block) can be modeled. **However:** The orchestrator must implement a listener that acts on these signals. Meteridian does not control the orchestrator. | Orchestrator-side enforcement listener not in Meteridian scope |
+| Enforcement Signals: Machine-readable directives to orchestrator (top-up, throttle, downgrade, block) | **Mostly met.** Meteridian can emit enforcement signals as webhook events or through its API. The signal types (throttle, downgrade, block) can be modeled. With METR-0011, signals are concretely defined as actions against Limitador's API (throttle via reduced quotas, block via zero quotas, restore via full quotas). | [METR-0011][metr-0011] §5 |
 
 **Gap:** Same as MB-002 — the enforcement signal emission is Meteridian's
 responsibility (met), but the enforcement action is the orchestrator's
@@ -275,10 +295,18 @@ schema, retry semantics) needs to be defined collaboratively.
 > zero quotas) without requiring a bespoke orchestrator listener. The Limitador
 > integration also enables the "top-up" flow: when the customer replenishes
 > their balance, Meteridian restores the Limitador quota.
+>
+> **2026-06-19 enforcement design revision:** [METR-0011][metr-0011] defines
+> the full enforcement signal schema (CloudEvents format), threshold-based
+> actions (notify at 75%, throttle at 90%, block at 100%), and the dual-path
+> delivery mechanism (see MB-002 revision above). This upgrades "Enforcement
+> Signals" from "Partially met" to **"Mostly met"** — the remaining gap is
+> only non-RHOAI deployments where a generic webhook schema (rather than
+> Limitador-specific) is needed.
 
-**Effort:** Shared with MB-002 Limitador integration (~1-2 weeks total for both,
-revised from ~2 weeks for enforcement schema alone). The enforcement signal
-webhook schema is still needed for non-RHOAI deployments.
+**Effort:** Shared with MB-002 Limitador integration (~2 weeks total for both).
+The generic enforcement signal webhook schema for non-RHOAI deployments is a
+future extension (~1 additional week).
 
 ---
 

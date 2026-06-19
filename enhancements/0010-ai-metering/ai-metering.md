@@ -421,6 +421,14 @@ request-phase balance check already queries a metering backend before
 allowing inference — Meteridian can serve as that metering backend or
 synchronize state with it.
 
+> **See also:** [METR-0011 (Enforcement Integration)][metr-0011] provides the
+> full closed-loop enforcement design with dual-path defense-in-depth (Balance
+> Check API + Limitador Quota Push). [ADR-0018][adr-0018] documents the
+> architectural decision.
+
+[metr-0011]: ../0011-enforcement-integration/enforcement-integration.md
+[adr-0018]: ../../docs/adr/0018-closed-loop-enforcement-limitador.md
+
 ### 3.7 Testing with the MaaS Metering Simulator
 
 The RHOAI team provides a [metering simulator][metering-simulator] for

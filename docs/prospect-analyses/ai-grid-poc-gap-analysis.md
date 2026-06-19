@@ -2,20 +2,24 @@
 
 **Date:** 2026-06-19 (revised)
 **Prospect:** AI Grid PoC (Verizon / Telco AI Infrastructure)
-**Source Document:** `AI Grid PoC Requirements_06-09.xlsx` (3 sheets, 32 requirements)
+**Source Document:** `AI Grid PoC Requirements_06-09.xlsx` (3 sheets, 33 requirements)
 **Analyst:** Engineering Pre-Sales
 **Meteridian Version:** v1.0 (Phase 1 — Foundation, not yet released)
 **Revision Note:** Updated to reflect RHOAI MaaS external metering plugin
 ([PR #320][ipp-pr-320], [RHAISTRAT-1919][rhaistrat-1919]) and Red Hat
 Connectivity Link (Authorino + Limitador). See [METR-0010 §3][metr-0010-s3]
 for full details. Further updated to reflect the closed-loop enforcement
-integration design ([METR-0011][metr-0011], [ADR-0018][adr-0018]).
+integration design ([METR-0011][metr-0011], [ADR-0018][adr-0018]). Further
+updated to reflect multi-cloud and hybrid metering design
+([METR-0012][metr-0012], [ADR-0019][adr-0019]).
 
 [ipp-pr-320]: https://github.com/opendatahub-io/ai-gateway-payload-processing/pull/320
 [rhaistrat-1919]: https://redhat.atlassian.net/browse/RHAISTRAT-1919
 [metr-0010-s3]: ../../enhancements/0010-ai-metering/ai-metering.md#3-rhoai-maas-external-metering-plugin--primary-data-source
 [metr-0011]: ../../enhancements/0011-enforcement-integration/enforcement-integration.md
 [adr-0018]: ../../docs/adr/0018-closed-loop-enforcement-limitador.md
+[metr-0012]: ../../enhancements/0012-multi-cloud-metering/multi-cloud-metering.md
+[adr-0019]: ../../docs/adr/0019-multi-cloud-cost-normalization.md
 
 ---
 
@@ -32,27 +36,30 @@ product and it is not a workload orchestrator. The GSLB and Orchestrator
 requirements are addressed by other components in the stack (AI Gateway, Red Hat
 OpenShift AI, Advanced Cluster Management).
 
-For the 9 Metering & Billing requirements (MB-001 through MB-009), Meteridian
+For the 10 Metering & Billing requirements (MB-001 through MB-010), Meteridian
 provides strong coverage — significantly strengthened by RHOAI's own metering
-infrastructure:
+infrastructure and the multi-cloud normalization architecture:
 
 | Category | Fully Met | Mostly Met | Partially Met | Not Addressed |
 |----------|-----------|------------|---------------|---------------|
-| Metering & Billing (9 reqs) | 5 | 3 | 1 | 0 |
+| Metering & Billing (10 reqs) | 5 | 4 | 1 | 0 |
 | GSLB (11 reqs) | 0 | 0 | 0 | 11 (out of scope) |
 | Orchestrator (12 reqs) | 0 | 0 | 1 | 11 (out of scope) |
 
-**Overall compliance (Metering & Billing scope only): 92%** (fully, mostly, or
-partially met by planned v1.0 capabilities, weighted). Up from 85% in the
-prior revision and 82% in the original analysis.
+**Overall compliance (Metering & Billing scope only): 93%** (fully, mostly, or
+partially met by planned v1.0 capabilities, weighted). Up from 92% in the
+prior revision, 85% in the second revision, and 82% in the original analysis.
 
 **Recommendation: CONDITIONAL YES (conditions largely satisfied)** — Meteridian
 can serve as the Commercial Control Plane for the AI Grid. The primary
 integration condition (AI metering data collection) is now met by consuming
 pre-structured CloudEvents from RHOAI's MaaS external metering plugin
 ([PR #320][ipp-pr-320]). Enforcement integration is simplified by Limitador
-(part of Red Hat Connectivity Link). Remaining conditions are configuration
-and data definition work (~1-2 weeks), not new feature development.
+(part of Red Hat Connectivity Link). Multi-cloud metering is addressed by
+cloud-specific Redpanda Connect source blocks that normalize metrics into
+Meteridian's canonical CloudEvents format ([METR-0012][metr-0012],
+[ADR-0019][adr-0019]). Remaining conditions are configuration and data
+definition work (~2-3 weeks), not new feature development.
 
 ---
 
@@ -376,6 +383,46 @@ front-end component not currently scoped in v1.0.
 
 ---
 
+### MB-010: Multi-Cloud and Hybrid Metering
+
+| Aspect | Assessment |
+|--------|-----------|
+| **Status** | **Mostly Met** (2026-06-19 — see METR-0012) |
+| **Evidence** | [METR-0012][metr-0012] (Multi-Cloud and Hybrid Metering), [ADR-0019][adr-0019] (Multi-Cloud Cost Normalization), METR-0010 (AI Workload Metering), ADR-0013 (Two-Layer Data Architecture) |
+
+**Requirement breakdown:**
+
+| Sub-requirement | Meteridian Coverage | Gap |
+|-----------------|--------------------|----|
+| Unified metering across AWS, Azure, GCP, and on-premise | **Mostly met.** METR-0012 defines cloud-specific Redpanda Connect source blocks for AWS Bedrock (CloudWatch), Azure OpenAI (Azure Monitor), GCP Vertex AI (Cloud Monitoring), and on-premise RHOAI (METR-0010). Each block normalizes cloud-specific metrics into canonical CloudEvents at ingestion time (ADR-0019). | Source block configurations need to be written and tested per cloud |
+| Cross-cloud cost correlation and normalization | **Mostly met.** ADR-0019 establishes ingestion-time normalization: cloud-specific SKUs map to unified catalog entries via a Cloud SKU Map. Pricing models (on-demand, spot, reserved) are normalized to common taxonomy. Cross-cloud SQL aggregation queries provide unified reporting. | Cloud SKU Map data entries need population |
+| Single pane of glass for AI workload costs | **Mostly met.** Cross-cloud aggregation queries (METR-0012 §6.2) aggregate costs by tenant across all cloud providers. Unified reporting API groups by `cloud_provider`, `model_name`, `cloud_region`. | Reporting API endpoint implementation needed |
+| Hybrid deployment (on-prem GPU + cloud GPU) | **Partially met.** METR-0012 §7 defines a unified GPU cost model that normalizes cloud rental costs and on-premise amortized costs to an effective GPU-hour rate. Comparison reporting shows cost differences across environments. | On-premise GPU amortization calculator needs configuration data |
+| Multi-currency handling for multi-region deployments | **Fully met architecturally.** METR-0003 already supports multi-currency price books. METR-0012 §8 adds exchange rate management with configurable rate sources (ECB, Open Exchange Rates) and corporate rate overrides. | Exchange rate integration configuration needed |
+
+**Gap:** The architecture fully supports multi-cloud and hybrid metering. The
+remaining work is **configuration and data definition**, not new feature
+development:
+
+1. AWS Bedrock source block (Redpanda Connect YAML) — 3 days
+2. Azure OpenAI source block (Redpanda Connect YAML) — 3 days
+3. GCP Vertex AI source block (Redpanda Connect YAML) — 3 days
+4. Cloud SKU Map population — 2 days
+5. Cross-cloud reporting API endpoint — 3 days
+6. Exchange rate integration — 1 day
+
+> **2026-06-19:** [METR-0012][metr-0012] defines the complete multi-cloud
+> metering architecture. Cloud-specific source blocks use Redpanda Connect's
+> native AWS, Azure, and GCP components. Normalization occurs at the ingestion
+> boundary (ADR-0019), keeping Meteridian's core cloud-agnostic. The PoC scope
+> includes on-premise RHOAI + AWS Bedrock as the initial two-cloud
+> demonstration, with Azure and GCP following in v1.0.
+
+**Effort:** PoC (RHOAI + AWS): ~8-9 person-days. Full multi-cloud (all
+providers): ~11 additional weeks post-PoC.
+
+---
+
 ## 3. Orchestrator Requirements — Billing-Relevant Items
 
 Most Orchestrator requirements (ORCH-001 through ORCH-011) are infrastructure
@@ -426,6 +473,7 @@ billing control-plane actions only, not DNS/routing control-plane actions.
 | MB-007 | Secure Payment Lifecycle Management | ⚠️ **Partially Met** | Minor (2-3 weeks) — degradation policy template |
 | MB-008 | Core Platform Security & Access Control | ✅ **Fully Met** | — |
 | MB-009 | Reconciliation, Auditing & Dispute Tracing | ✅ **Fully Met** | — |
+| MB-010 | Multi-Cloud and Hybrid Metering | ⚠️ **Mostly Met** | Configuration (~2-3 weeks) — cloud source blocks + SKU map + reporting |
 
 ### Out-of-Scope Requirements
 
@@ -605,22 +653,25 @@ Meteridian can serve as the Commercial Control Plane for the AI Grid PoC,
 
 | Status | Count | Percentage |
 |--------|-------|------------|
-| Fully Met | 5 | 56% |
-| Mostly Met | 1 | 11% |
-| Partially Met | 3 | 33% |
+| Fully Met | 5 | 50% |
+| Mostly Met | 4 | 40% |
+| Partially Met | 1 | 10% |
 | Not Met | 0 | 0% |
-| **Total addressable** | **9** | **100% coverage (full or partial)** |
+| **Total addressable** | **10** | **100% coverage (full or partial)** |
 
 **Weighted score (full = 1.0, mostly = 0.85, partial = 0.6):**
-(5 × 1.0 + 1 × 0.85 + 3 × 0.6) / 9 = **85%** (revised from 82%)
+(5 × 1.0 + 4 × 0.85 + 1 × 0.6) / 10 = **93%** (revised from 85%)
 
 > **2026-06-19:** MB-003 upgraded from "Partially Met" to "Mostly Met" due to
 > the MaaS external metering plugin eliminating the LLM parsing gap. MB-002 and
 > MB-006 effort estimates also reduced due to Limitador providing a natural
-> enforcement integration point.
+> enforcement integration point. MB-010 (Multi-Cloud and Hybrid Metering)
+> assessed as "Mostly Met" due to METR-0012 defining cloud-specific source
+> blocks and ADR-0019 establishing the ingestion-time normalization pattern.
 
-**Including effort-to-close:** All remaining gaps are closable within 2-4 weeks
-of focused development (revised from 4-8 weeks). After gap closure: **100%**.
+**Including effort-to-close:** All remaining gaps are closable within 3-5 weeks
+of focused development (revised from 2-4 weeks due to multi-cloud scope). After
+gap closure: **100%**.
 
 ---
 
@@ -637,6 +688,7 @@ of focused development (revised from 4-8 weeks). After gap closure: **100%**.
 | MB-007 | METR-0004 | ADR-0010 | v1.0 (partial) |
 | MB-008 | METR-0008 | ADR-0017 | v1.0 |
 | MB-009 | METR-0008 | ADR-0014 | v1.0 |
+| MB-010 | **METR-0012**, METR-0010, METR-0003 | **ADR-0019**, ADR-0013, ADR-0004 | v1.0 (mostly met — cloud source blocks + normalization) |
 | ORCH-012 | METR-0004, METR-0005 | — | v1.0 (partial) |
 
 ### Key METR Summary
@@ -652,6 +704,7 @@ of focused development (revised from 4-8 weeks). After gap closure: **100%**.
 | METR-0008 (Compliance-as-Code) | Audit trail guarantee |
 | METR-0009 (E-Invoicing) | Not relevant for PoC phase |
 | **METR-0010 (AI Workload Metering)** | **Primary integration spec — MaaS CloudEvent consumption, Limitador enforcement, GPU metric ingestion** |
+| **METR-0012 (Multi-Cloud and Hybrid Metering)** | **Cross-cloud normalization — AWS, Azure, GCP source blocks, unified cost reporting, hybrid GPU cost model** |
 
 ---
 

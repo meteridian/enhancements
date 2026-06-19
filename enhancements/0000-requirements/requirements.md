@@ -328,7 +328,7 @@ to a global telco sovereign cloud.
   collection while Meteridian focuses on metering and rating.
 
 - **US-024:** As a FinOps tool integrator, I want to export our cost data in
-  FOCUS v1.1 format to S3 nightly so that our FinOps platform (CloudHealth,
+  FOCUS v1.4 format to S3 nightly so that our FinOps platform (CloudHealth,
   Apptio, Vantage) can consume it without custom ETL.
 
 - **US-025:** As a telco BSS team, I want Meteridian to expose TM Forum TMF635

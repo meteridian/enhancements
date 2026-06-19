@@ -28,6 +28,7 @@ enhancements/                          # Enhancement proposals (METRs)
   0009-e-invoicing-engine/             # METR-0009: Native e-invoicing engine
   0010-ai-metering/                    # METR-0010: AI workload metering
   0011-enforcement-integration/        # METR-0011: Enforcement integration (Limitador)
+  0012-multi-cloud-metering/           # METR-0012: Multi-cloud and hybrid metering
 docs/
   adr/                                 # Architecture Decision Records (ADRs)
   competitive/                         # Competitive research and market analysis

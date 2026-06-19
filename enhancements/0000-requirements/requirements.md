@@ -342,7 +342,7 @@ to a global telco sovereign cloud.
 4. **Deployment:** Kubernetes (primary), single-binary (micro), bare-metal (supported)
 5. **Minimum resource:** Single-binary profile: 2 CPU, 4GB RAM, 50GB disk
 6. **No vendor lock-in:** No hard dependency on any cloud provider or proprietary service
-7. **Backward compatibility:** Migration path from Koku for existing customers
+7. **Koku compatibility:** Optional Koku-compatible API adapter for existing Koku consumers (nice to have)
 
 ## Success Metrics
 

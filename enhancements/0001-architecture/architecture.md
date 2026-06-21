@@ -510,14 +510,11 @@ Run "what-if" scenarios on historical usage data with hypothetical rate plans.
 
 ### Architecture
 
-```
-Historical Events (immutable store)
-    |
-    +-- Shadow Rating Engine (same code, different rate plan)
-    |       |
-    |       +-- Shadow Ledger (temporary, isolated)
-    |               |
-    |               +-- Comparison Report (delta vs. actual)
+```mermaid
+flowchart TD
+    A["Historical Events<br/>(immutable store)"] --> B["Shadow Rating Engine<br/>(same code, different rate plan)"]
+    B --> C["Shadow Ledger<br/>(temporary, isolated)"]
+    C --> D["Comparison Report<br/>(delta vs. actual)"]
 ```
 
 Simulation uses the SAME rating engine as production. Results stored in temporary
@@ -609,15 +606,15 @@ Every correction creates a provenance chain (original -> correction -> ...).
 
 ### Contract Structure
 
-```
-Contract
-  +-- Term (dates, renewal type)
-  +-- Committed Spend (minimum, true-up schedule, shortfall penalty)
-  +-- Rate Schedule (custom rates, effective periods, volume tiers)
-  +-- Credit Grants (prepaid blocks, promotional, priority, rollover)
-  +-- Amendments (price/scope changes, approval workflow)
-  +-- Hierarchical Accounts (parent/children, shared/separate pools)
-  +-- SLA Terms (uptime, credit penalties, performance guarantees)
+```mermaid
+flowchart TD
+    Contract["Contract"] --> Term["Term<br/>(dates, renewal type)"]
+    Contract --> Spend["Committed Spend<br/>(minimum, true-up schedule,<br/>shortfall penalty)"]
+    Contract --> Rate["Rate Schedule<br/>(custom rates, effective periods,<br/>volume tiers)"]
+    Contract --> Credits["Credit Grants<br/>(prepaid blocks, promotional,<br/>priority, rollover)"]
+    Contract --> Amend["Amendments<br/>(price/scope changes,<br/>approval workflow)"]
+    Contract --> Accounts["Hierarchical Accounts<br/>(parent/children,<br/>shared/separate pools)"]
+    Contract --> SLA["SLA Terms<br/>(uptime, credit penalties,<br/>performance guarantees)"]
 ```
 
 ### Key Capabilities
@@ -638,23 +635,31 @@ Contract
 ### Three Dimensions
 
 1. **Credit-Based Billing** -- Abstract consumption into credits; prepaid wallets
-2. **DePIN Settlement** -- Usage triggers token burns; providers receive minted tokens
+2. **Capacity Tokenization** -- Usage triggers token burns; providers receive minted tokens
 3. **Internal Token Economy** -- Departments get token budgets; gamified chargeback
 
 ### Credit Wallet System
 
-```
-Tenant
-  +-- Wallet (per credit type)
-       +-- Credit Grants (ordered by priority)
-       |     +-- Grant 1: "Annual Commitment" (1M, expires 2027-01-01, priority: 1)
-       |     +-- Grant 2: "Promotional" (10K, expires 2026-09-01, priority: 0)
-       |     +-- Grant 3: "Top-Up" (50K, no expiry, priority: 2)
-       +-- Balance (real-time: Valkey DECRBY)
-       +-- Policies
-             +-- Rollover: 25% max, 90-day window
-             +-- Overage: PayGo at 1.5x standard rate
-             +-- Auto-top-up: trigger at 10% remaining
+```mermaid
+flowchart TD
+    Tenant["Tenant"] --> Wallet["Wallet<br/>(per credit type)"]
+
+    subgraph Grants["Credit Grants (ordered by priority)"]
+        G1["Grant 1: Annual Commitment<br/>(1M, expires 2027-01-01, priority: 1)"]
+        G2["Grant 2: Promotional<br/>(10K, expires 2026-09-01, priority: 0)"]
+        G3["Grant 3: Top-Up<br/>(50K, no expiry, priority: 2)"]
+    end
+
+    Wallet --> Grants
+    Wallet --> Balance["Balance<br/>(real-time: Valkey DECRBY)"]
+
+    subgraph Policies["Policies"]
+        P1["Rollover: 25% max, 90-day window"]
+        P2["Overage: PayGo at 1.5x standard rate"]
+        P3["Auto-top-up: trigger at 10% remaining"]
+    end
+
+    Wallet --> Policies
 ```
 
 Lowest priority number burns first (promotional before paid).
@@ -691,14 +696,17 @@ Organization Pool (1M credits/month)
 
 Enforcement policies per budget node: `alert`, `throttle`, `block`, `auto_upgrade`.
 
-### DePIN Settlement (Phase 3)
+### Capacity Tokenization (Phase 3)
 
 For decentralized infrastructure operators:
 
-```
-Usage Event --> Rate --> Fiat cost ($X) --> Token burn (Y = $X / price)
-    --> On-chain: smart contract burns Y tokens
-    --> Provider: mint Z tokens (emission schedule)
+```mermaid
+flowchart TD
+    A["Usage Event"] --> B["Rate"]
+    B --> C["Fiat cost ($X)"]
+    C --> D["Token burn<br/>(Y = $X / price)"]
+    D --> E["On-chain:<br/>smart contract burns Y tokens"]
+    D --> F["Provider:<br/>mint Z tokens<br/>(emission schedule)"]
 ```
 
 Chain-agnostic adapter interface (Ethereum, Cosmos, Solana, Substrate).
@@ -814,7 +822,7 @@ telco customers), not embedded in core.
 3. Cost allocation with distribution (platform, worker, storage, network, GPU)
 4. Optimization engine integration (robne, Kubernaut)
 5. Virtual tags with visual rule builder
-6. Tokenomics engine with DePIN settlement
+6. Tokenomics engine with capacity tokenization
 7. On-premises first with sovereign cloud compliance
 
 ## 21. Reference Integrations

@@ -54,63 +54,74 @@ measurement line and standard.
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         DATA COLLECTION                                   │
-│                                                                           │
-│  meteridian-collector (Redpanda Connect + custom plugins)                │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐     │
-│  │Prometheus│ │K8s API   │ │SNMP/     │ │vSphere/  │ │Cloud APIs│     │
-│  │OTel/PCP  │ │Informers │ │Redfish   │ │libvirt   │ │CUR/BQ    │     │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘     │
-│       └──────────────┴───────────┴─────────────┴────────────┘           │
-│                              │ CloudEvents                               │
-└──────────────────────────────┼───────────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         HOT PATH (~1.3s p99)                             │
-│                                                                           │
-│  Ingest ──► Validate ──► Deduplicate ──► Enrich ──► Rate ──► Store      │
-│                                            │                              │
-│                                            ├──► Balance Update (Valkey)   │
-│                                            │                              │
-│                                            └──► Enforce (budget caps)     │
-└──────────────────────────────┬───────────────────────────────────────────┘
-                               │ async fan-out
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         WARM PATH (async)                                 │
-│                                                                           │
-│  Anomaly Detection (Augurs) ──► Alert                                    │
-│  Optimization (robne/Kubernaut) ──► Recommendation / Enforcement         │
-│  Forecasting (Augurs ETS/MSTL) ──► Budget Projection                    │
-│  Virtual Tags (ZEN Engine) ──► Enrichment Feedback                       │
-└─────────────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         STORAGE                                           │
-│                                                                           │
-│  PostgreSQL + TimescaleDB          Valkey                                 │
-│  ┌──────────────────────┐         ┌───────────────┐                     │
-│  │ Immutable Event Store │         │ Real-Time     │                     │
-│  │ (hypertables)         │         │ Balances      │                     │
-│  │ Catalog + Contracts   │         │ Idempotency   │                     │
-│  │ Tenant Schemas        │         │ Rate Cache    │                     │
-│  └──────────────────────┘         └───────────────┘                     │
-└─────────────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         API + PORTALS                                     │
-│                                                                           │
-│  REST API ──► Service Provider Portal                                    │
-│           ──► Tenant Admin Portal                                        │
-│           ──► Customer Self-Service Portal                               │
-│           ──► External Billing (Lago, Stripe, SAP)                       │
-│           ──► FOCUS v1.1 Export                                          │
-│           ──► TM Forum APIs (TMF635, TMF678)                            │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    %% DATA COLLECTION LAYER
+    subgraph DC["DATA COLLECTION"]
+        direction TB
+        Collector["meteridian-collector<br/>(Redpanda Connect + custom plugins)"]
+        subgraph Sources[" "]
+            S1["Prometheus<br/>OTel / PCP"]
+            S2["K8s API<br/>Informers"]
+            S3["SNMP /<br/>Redfish"]
+            S4["vSphere /<br/>libvirt"]
+            S5["Cloud APIs<br/>CUR / BQ"]
+        end
+        S1 & S2 & S3 & S4 & S5 --> Collector
+    end
+
+    Collector -->|"CloudEvents"| Ingest
+
+    %% HOT PATH LAYER
+    subgraph HP["HOT PATH (~1.3s p99)"]
+        direction LR
+        Ingest([Ingest]) --> Validate([Validate])
+        Validate --> Dedup([Deduplicate])
+        Dedup --> Enrich([Enrich])
+        Enrich --> Rate([Rate])
+        Rate --> Store([Store])
+        Enrich -->|"side-effect"| Balance["Balance Update<br/>(Valkey)"]
+        Enrich -->|"side-effect"| Enforce["Enforce<br/>(budget caps)"]
+    end
+
+    Store -->|"async fan-out"| WP
+
+    %% WARM PATH LAYER
+    subgraph WP["WARM PATH (async)"]
+        Anomaly["Anomaly Detection<br/>(Augurs)"] -->|"triggers"| Alert["Alert"]
+        Optimization["Optimization<br/>(robne / Kubernaut)"] -->|"produces"| Recommendation["Recommendation /<br/>Enforcement"]
+        Forecasting["Forecasting<br/>(Augurs ETS/MSTL)"] -->|"produces"| Projection["Budget Projection"]
+        VTags["Virtual Tags<br/>(ZEN Engine)"] -->|"produces"| Feedback["Enrichment Feedback"]
+    end
+
+    WP --> STR
+
+    %% STORAGE LAYER
+    subgraph STR["STORAGE"]
+        subgraph PG["PostgreSQL + TimescaleDB"]
+            PG1[("Immutable Event Store<br/>(hypertables)")]
+            PG2[("Catalog + Contracts")]
+            PG3[("Tenant Schemas")]
+        end
+        subgraph VK["Valkey"]
+            VK1[("Real-Time Balances")]
+            VK2[("Idempotency")]
+            VK3[("Rate Cache")]
+        end
+    end
+
+    STR --> API
+
+    %% API + PORTALS LAYER
+    subgraph AP["API + PORTALS"]
+        API["REST API"]
+        API --> Portal1["Service Provider Portal"]
+        API --> Portal2["Tenant Admin Portal"]
+        API --> Portal3["Customer Self-Service Portal"]
+        API --> Billing["External Billing<br/>(Lago, Stripe, SAP)"]
+        API --> FOCUS["FOCUS v1.4 Export"]
+        API --> TMF["TM Forum APIs<br/>(TMF635, TMF678)"]
+    end
 ```
 
 ## 1. Data Collection Architecture
@@ -559,7 +570,7 @@ Sandboxed (read-only, timeout, row limit).
 | Type | Format | Delivery | Use Case |
 |------|--------|----------|----------|
 | Usage report | CSV, Parquet, JSON | S3/GCS, SFTP, webhook | Cost analysis |
-| FOCUS export | FOCUS v1.1 (Parquet) | S3/GCS | FinOps tooling |
+| FOCUS export | FOCUS v1.4 (Parquet) | S3/GCS | FinOps tooling |
 | Event replay | CloudEvents (JSON) | Kafka, S3 | Customer analytics |
 | Invoice data | CSV, PDF | Email, S3 | Accounting |
 | Audit log | JSON | S3, syslog | Compliance |
@@ -713,7 +724,7 @@ GET    /api/v1/budgets/{id}/utilization   # Current spend vs. budget
 
 | Requirement | Priority | Implementation |
 |-------------|----------|----------------|
-| FOCUS v1.1 native export | Must-have | Built-in schema mapper; Parquet to S3/GCS |
+| FOCUS v1.4 native export | Must-have | Built-in schema mapper; Parquet to S3/GCS |
 | Unit economics | Must-have | Derived metrics: cost per transaction/user/feature |
 | Budget guardrails (FinOps-as-Code) | Must-have | GitOps YAML policies; OPA evaluation |
 | Anomaly detection with root cause | Must-have | Augurs + drill-down API |
@@ -865,7 +876,7 @@ start/stop.
 
 ## References
 
-- [FOCUS Specification v1.1](https://focus.finops.org/)
+- [FOCUS Specification v1.4](https://focus.finops.org/)
 - [Redpanda Connect](https://docs.redpanda.com/redpanda-connect/)
 - [CloudNativePG](https://cloudnative-pg.io/)
 - [GoRules ZEN Engine](https://github.com/gorules/zen)

@@ -41,7 +41,7 @@ measurement line and standard.
 - Real-time balance management with consumption enforcement
 - On-premises first, cloud-ready
 - Telco-grade rating (tiered, time-of-day, bundles, commitments, prepaid)
-- Full tokenomics engine (credits, wallets, pooling, DePIN settlement)
+- Full tokenomics engine (credits, wallets, pooling, capacity tokenization)
 - Optimization integration (robne, Kubernaut)
 - Open source (Apache 2.0), no vendor lock-in
 
@@ -50,7 +50,7 @@ measurement line and standard.
 - OCI support (deprecated/removed)
 - Replacing invoice generation (delegate to Lago/Stripe)
 - Building a full ERP system
-- Blockchain-native architecture (DePIN is an optional integration, not core)
+- Blockchain-native architecture (capacity tokenization is a pluggable block, not a core dependency)
 
 ## Architecture Overview
 

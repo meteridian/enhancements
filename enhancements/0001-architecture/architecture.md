@@ -590,17 +590,17 @@ PgBouncer for direct query access (scoped to tenant schema).
 
 ### Correction Flow
 
-```
-Late event arrives (event_time = 30 days ago)
-    |
-    +-- Write to immutable event store (TimescaleDB hypertable)
-    +-- Invalidate affected continuous aggregate chunk
-    +-- If within current billing period:
-    |       +-- Recalculate balance (Valkey update)
-    |       +-- Emit: billing.balance.adjusted
-    +-- If in closed period:
-            +-- Flag for credit/debit memo on next invoice
-            +-- Emit: billing.correction.pending
+```mermaid
+flowchart TD
+    A["Late event arrives<br/>(event_time = 30 days ago)"] --> B["Write to immutable event store<br/>(TimescaleDB hypertable)"]
+    B --> C["Invalidate affected<br/>continuous aggregate chunk"]
+    C --> D{"Within current<br/>billing period?"}
+
+    D -->|Yes| E["Recalculate balance<br/>(Valkey update)"]
+    E --> F(["Emit:<br/>billing.balance.adjusted"])
+
+    D -->|No – closed period| G["Flag for credit/debit memo<br/>on next invoice"]
+    G --> H(["Emit:<br/>billing.correction.pending"])
 ```
 
 Every correction creates a provenance chain (original -> correction -> ...).

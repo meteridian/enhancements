@@ -3,7 +3,7 @@
 - **Status:** provisional
 - **Authors:** @pgarciaq, @jordigilh
 - **Created:** 2026-06-18
-- **Last Updated:** 2026-06-18
+- **Last Updated:** 2026-06-22
 - **Depends on:** METR-0001 (Platform Architecture)
 - **Related:** METR-0002 (Extensibility), METR-0004 (Credit, Prepaid, and Token Billing), METR-0005 (Internal Budget Units), METR-0006 (Developer Experience)
 
@@ -22,8 +22,9 @@
 9. [Credit and Token Products](#9-credit-and-token-products)
 10. [Catalog API](#10-catalog-api)
 11. [Integration with Block Runtime](#11-integration-with-block-runtime)
-12. [Open Questions](#12-open-questions)
-13. [References](#13-references)
+12. [External Catalog Integration (Bring Your Own Catalog)](#12-external-catalog-integration-bring-your-own-catalog)
+13. [Open Questions](#13-open-questions)
+14. [References](#14-references)
 
 ---
 
@@ -37,12 +38,12 @@ memo, revenue recognition entry, and usage alert traces back to catalog data.
 The catalog follows a hierarchical model proven by enterprise billing platforms
 (Zuora, Stripe Billing, Chargebee, Orb, lago):
 
-```
-  Product
-    └── Plan (Rate Plan)
-          └── Charge (Charge Model)
-                └── Tier (Price Bracket)
-                      └── Price Book Entry (Currency / Region)
+```mermaid
+flowchart TD
+    Product --> Plan["Plan (Rate Plan)"]
+    Plan --> Charge["Charge (Charge Model)"]
+    Charge --> Tier["Tier (Price Bracket)"]
+    Tier --> PBE["Price Book Entry (Currency / Region)"]
 ```
 
 Beyond the hierarchy, Meteridian introduces two concepts not found in
@@ -132,36 +133,19 @@ books, and integration with the block runtime.
 The catalog uses a five-level hierarchy. Each level has a well-defined
 responsibility:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          PRODUCT CATALOG                           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌───────────┐                                                      │
-│  │  Product   │  Top-level grouping. "Compute", "Storage", "GPU"   │
-│  └─────┬─────┘                                                      │
-│        │ 1:N                                                        │
-│  ┌─────▼─────┐                                                      │
-│  │   Plan     │  Purchasable bundle. "Starter", "Pro", "Enterprise"│
-│  │(Rate Plan) │  Can inherit from a parent plan.                    │
-│  └─────┬─────┘                                                      │
-│        │ 1:N                                                        │
-│  ┌─────▼─────┐                                                      │
-│  │  Charge    │  Individual billable item. "CPU Usage", "API Calls"│
-│  │(Charge     │  Has a charge model (recurring, usage, one-time,   │
-│  │  Model)    │  tiered, volume, staircase, percentage).           │
-│  └─────┬─────┘                                                      │
-│        │ 1:N (if tiered/volume/staircase)                           │
-│  ┌─────▼─────┐                                                      │
-│  │   Tier     │  Price bracket. "0-100 units @ $0.10/unit"         │
-│  └─────┬─────┘                                                      │
-│        │ N:M                                                        │
-│  ┌─────▼─────────┐                                                  │
-│  │  Price Book    │  Currency- and region-specific pricing.              │
-│  │  Entry         │  USD, EUR, GBP, JPY per charge or tier.           │
-│  └───────────────┘                                                  │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Catalog["Product Catalog"]
+        Product["Product<br/>Top-level grouping: Compute, Storage, GPU"]
+        Plan["Plan (Rate Plan)<br/>Purchasable bundle; can inherit from parent"]
+        Charge["Charge (Charge Model)<br/>Billable item with charge model"]
+        Tier["Tier<br/>Price bracket, e.g. 0–100 units @ $0.10/unit"]
+        PBE["Price Book Entry<br/>Currency- and region-specific pricing"]
+    end
+    Product -->|"1:N"| Plan
+    Plan -->|"1:N"| Charge
+    Charge -->|"1:N (tiered/volume/staircase)"| Tier
+    Tier -->|"N:M"| PBE
 ```
 
 ### 3.2 Product
@@ -232,19 +216,20 @@ CREATE TABLE catalog.plans (
 plan structure. A child plan inherits all charges from its parent and can
 override specific charges or add new ones:
 
-```
-  Standard Plan (v3)
-    ├── CPU Usage:    $0.10/core-hour
-    ├── Memory Usage: $0.02/GB-hour
-    ├── Storage:      $0.023/GB-month
-    └── API Calls:    $0.001/call
-
-  Enterprise Plan (inherits from Standard v3)
-    ├── CPU Usage:    $0.07/core-hour   ← overridden (30% discount)
-    ├── Memory Usage: $0.02/GB-hour     ← inherited
-    ├── Storage:      $0.018/GB-month   ← overridden (committed volume)
-    ├── API Calls:    $0.001/call       ← inherited
-    └── Dedicated Support: $5,000/month ← added
+```mermaid
+flowchart TD
+    subgraph Standard["Standard Plan (v3)"]
+        S1["CPU Usage: $0.10/core-hour"]
+        S2["Memory Usage: $0.02/GB-hour"]
+        S3["Storage: $0.023/GB-month"]
+        S4["API Calls: $0.001/call"]
+    end
+    Standard -->|"inherits"| Enterprise["Enterprise Plan (inherits from Standard v3)"]
+    Enterprise --> E1["CPU Usage: $0.07/core-hour (30% discount)"]
+    Enterprise --> E2["Memory Usage: $0.02/GB-hour (inherited)"]
+    Enterprise --> E3["Storage: $0.018/GB-month (committed volume)"]
+    Enterprise --> E4["API Calls: $0.001/call (inherited)"]
+    Enterprise --> E5["Dedicated Support: $5,000/month (added)"]
 ```
 
 ### 3.4 Charge (Charge Model)
@@ -373,27 +358,51 @@ CREATE TABLE catalog.price_book_entries (
 
 ### 3.7 Entity Relationship Diagram
 
-```
-┌──────────┐       ┌──────────┐       ┌──────────┐       ┌──────────┐
-│ Product  │──1:N──│   Plan   │──1:N──│  Charge  │──1:N──│   Tier   │
-│          │       │          │       │          │       │          │
-│ slug     │       │ version  │       │ model    │       │ bounds   │
-│ category │       │ parent?  │       │ resource │       │ price    │
-│ status   │       │ billing  │       │ cadence  │       │ ordinal  │
-└──────────┘       │ period   │       └────┬─────┘       └────┬─────┘
-                   └──────────┘            │                   │
-                        │                  │                   │
-                        │            ┌─────▼───────────────────▼─────┐
-                        │            │     Price Book Entry          │
-                        │            │     (currency-specific price) │
-                        │            └─────┬────────────────────────┘
-                        │                  │
-                   ┌────▼─────┐     ┌──────▼─────┐
-                   │ Subscrip-│     │ Price Book  │
-                   │ tion     │     │             │
-                   │ (tenant) │     │ currency    │
-                   └──────────┘     │ region      │
-                                    └─────────────┘
+```mermaid
+erDiagram
+    Product ||--o{ Plan : "1:N"
+    Plan ||--o{ Charge : "1:N"
+    Charge ||--o{ Tier : "1:N"
+    Charge ||--o{ PriceBookEntry : "N:M"
+    Tier ||--o{ PriceBookEntry : "N:M"
+    Plan ||--o{ Subscription : "tenant"
+    PriceBook ||--o{ PriceBookEntry : "contains"
+
+    Product {
+        uuid id
+        text slug
+        text category
+        text status
+    }
+    Plan {
+        uuid id
+        int version
+        uuid parent_plan_id
+        text billing_period
+    }
+    Charge {
+        uuid id
+        text charge_model
+        uuid resource_type_id
+        text billing_cadence
+    }
+    Tier {
+        numeric lower_bound
+        numeric upper_bound
+        numeric unit_price
+        int ordinal
+    }
+    PriceBookEntry {
+        numeric unit_price
+        text currency
+    }
+    PriceBook {
+        text currency
+        text region
+    }
+    Subscription {
+        uuid tenant_id
+    }
 ```
 
 ---
@@ -628,15 +637,26 @@ GROUP BY tenant_id, payload->>'endpoint';
 
 ### 5.4 Metric Lifecycle
 
-```
-  ┌───────┐       ┌────────┐       ┌──────────┐       ┌─────────────┐
-  │ Draft │──────►│ Active │──────►│Deprecated│──────►│  Retired    │
-  └───────┘       └────────┘       └──────────┘       └─────────────┘
-     │                │                  │
-     │  Author edits  │  Used for        │  New version
-     │  freely.       │  billing.        │  replaces it.
-     │  Dry-run only. │  Immutable SQL.  │  Historical queries
-     │                │                  │  still resolve to it.
+```mermaid
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Active : activate
+    Active --> Deprecated : new version
+    Deprecated --> Retired : no active references
+    Retired --> [*]
+
+    note right of Draft
+        Author edits freely.
+        Dry-run only.
+    end note
+    note right of Active
+        Used for billing.
+        Immutable SQL.
+    end note
+    note right of Deprecated
+        Historical queries
+        still resolve to it.
+    end note
 ```
 
 - **Draft** metrics can be edited freely and dry-run against historical data.
@@ -803,11 +823,15 @@ SELECT * FROM ranked_charges WHERE rn = 1;
 Plans are versioned. When a plan is modified, a new version is created; the
 previous version remains active for existing subscribers until they are migrated.
 
-```
-  Plan: compute-pro
-    ├── v1 (effective 2026-01-01 → 2026-04-01)  ── 23 active subscriptions
-    ├── v2 (effective 2026-04-01 → 2026-07-01)  ── 156 active subscriptions
-    └── v3 (effective 2026-07-01 → NULL)         ── new subscribers get this
+```mermaid
+gantt
+    title Plan compute-pro versions
+    dateFormat YYYY-MM-DD
+    axisFormat %b %Y
+    section Subscribers
+    v1 (23 active)     :2026-01-01, 2026-04-01
+    v2 (156 active)    :2026-04-01, 2026-07-01
+    v3 (new default)   :2026-07-01, 2027-01-01
 ```
 
 Version migration is explicit. The platform never silently moves a subscriber
@@ -860,12 +884,15 @@ POST /api/v1/catalog/plans/compute-pro/charges
 Every catalog entity (plan, charge, tier, price book entry) is effective-dated
 using a validity window:
 
-```
-            effective_start                  effective_end
-                  │                               │
-  ────────────────┼───────────────────────────────┼──────────────
-                  │         ENTITY IS VALID        │
-                  │◄──────────────────────────────►│
+```mermaid
+gantt
+    title Entity validity window
+    dateFormat YYYY-MM-DD
+    axisFormat %b %Y
+    section Validity
+    effective_start (inclusive) :milestone, 2026-01-01, 0d
+    Entity is valid               :2026-01-01, 2026-12-31
+    effective_end (exclusive)     :milestone, 2027-01-01, 0d
 ```
 
 - `effective_start` is inclusive, `effective_end` is exclusive.
@@ -921,26 +948,16 @@ Late-arriving events (events with a timestamp in the past) are rated using the
 rate plan that was active at the event's timestamp, not the current rate plan.
 This is a critical correctness property.
 
-```
-  Timeline:
-  ───────────────────────────────────────────────────────►
-  Jan 1          Feb 1          Mar 1          Apr 1
-    │              │              │              │
-    │  Rate: $0.10 │  Rate: $0.08 │  Rate: $0.06 │
-    │              │              │              │
-    │              │     ▲        │              │
-    │              │     │        │              │
-    │              │  Late event  │              │
-    │              │  arrives Mar │              │
-    │              │  15 with     │              │
-    │              │  timestamp   │              │
-    │              │  Feb 12      │              │
-    │              │              │              │
-    │              │  Rated at    │              │
-    │              │  $0.08 (Feb  │              │
-    │              │  rate), NOT  │              │
-    │              │  $0.06       │              │
-    │              │  (current)   │              │
+```mermaid
+timeline
+    title Late-arriving event rated at event timestamp
+    section Jan 2026 : Rate $0.10
+    section Feb 2026 : Rate $0.08
+        Feb 12 : Usage event (timestamp)
+        Mar 15 : Event arrives (processed)
+        Note : Rated at $0.08 (Feb rate), not $0.06 (Apr current)
+    section Mar 2026 : Rate $0.06
+    section Apr 2026 : Rate $0.06
 ```
 
 ### 7.5 Audit Log
@@ -1025,14 +1042,14 @@ Response:
 Meteridian supports multi-currency billing through a price book model that
 separates pricing from the core charge definition:
 
-```
-  Charge: CPU Usage ($0.10/core-hour — base price in USD)
-    │
-    ├── USD Price Book:  $0.10/core-hour
-    ├── EUR Price Book:  €0.092/core-hour
-    ├── GBP Price Book:  £0.079/core-hour
-    ├── JPY Price Book:  ¥15.50/core-hour
-    └── BRL Price Book:  R$0.52/core-hour
+```mermaid
+flowchart TD
+    Charge["Charge: CPU Usage<br/>Base price USD $0.10/core-hour"]
+    Charge --> USD["USD Price Book: $0.10/core-hour"]
+    Charge --> EUR["EUR Price Book: €0.092/core-hour"]
+    Charge --> GBP["GBP Price Book: £0.079/core-hour"]
+    Charge --> JPY["JPY Price Book: ¥15.50/core-hour"]
+    Charge --> BRL["BRL Price Book: R$0.52/core-hour"]
 ```
 
 Each tenant has a **settlement currency** (the currency invoices are issued in)
@@ -1451,20 +1468,12 @@ The rating engine is implemented as a standard processing block (METR-0002). It
 sits in the pipeline between metering (event ingestion) and billing (invoice
 generation):
 
-```
-  ┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-  │ Collector│────►│ Enricher │────►│  Rater   │────►│ Invoice  │
-  │ (source) │     │(transform│     │(transform│     │Generator │
-  │          │     │  block)  │     │  block)  │     │  (sink)  │
-  └──────────┘     └──────────┘     └──────────┘     └──────────┘
-                                         │
-                                         │ queries
-                                         ▼
-                                   ┌──────────┐
-                                   │ Catalog  │
-                                   │  Cache   │
-                                   │ (Valkey) │
-                                   └──────────┘
+```mermaid
+flowchart LR
+    Collector["Collector<br/>(source block)"] --> Enricher["Enricher<br/>(transform block)"]
+    Enricher --> Rater["Rater<br/>(transform block)"]
+    Rater --> Invoice["Invoice Generator<br/>(sink block)"]
+    Rater --> Cache["Catalog Cache<br/>(Valkey)"]
 ```
 
 The rater block receives Arrow RecordBatches containing usage events (tenant_id,
@@ -1476,16 +1485,16 @@ information appended (unit_price, amount, currency, charge_id, plan_id).
 For hot-path performance, the rating block does not query PostgreSQL on every
 event. Instead, catalog data is cached in Valkey (ADR-0002):
 
-```
-  Valkey cache structure:
+Valkey cache keys (examples):
 
-  catalog:plan:{plan_id}:v{version}              → serialized plan + charges
-  catalog:charge:{charge_id}:effective:{date}    → effective charge at date
-  catalog:tiers:{charge_id}                      → ordered tier list
-  catalog:pricebook:{pricebook_id}:{charge_id}   → currency-specific price
-  catalog:resource_type:{name}                   → resource type definition
-  catalog:metric:{slug}:v{version}               → metric definition
-```
+| Key pattern | Value |
+|-------------|-------|
+| `catalog:plan:{plan_id}:v{version}` | Serialized plan and charges |
+| `catalog:charge:{charge_id}:effective:{date}` | Effective charge at date |
+| `catalog:tiers:{charge_id}` | Ordered tier list |
+| `catalog:pricebook:{pricebook_id}:{charge_id}` | Currency-specific price |
+| `catalog:resource_type:{name}` | Resource type definition |
+| `catalog:metric:{slug}:v{version}` | Metric definition |
 
 Cache invalidation strategy:
 
@@ -1537,9 +1546,122 @@ The catalog emits the following events on the `catalog.*` Valkey Pub/Sub channel
 
 ---
 
-## 12. Open Questions
+## 12. External Catalog Integration (Bring Your Own Catalog)
 
-### 12.1 Catalog Storage Engine
+Meteridian's native product catalog (PostgreSQL plus Valkey pub/sub cache) is
+the **system of record for rating**. The rating block on the hot path reads
+catalog data from local cache; meters cannot apply rates without catalog entries
+materialized in this canonical model. External systems are not queried live
+during rating — that would violate latency and consistency requirements for
+billing-grade accuracy.
+
+Organizations that already maintain product definitions elsewhere can still use
+Meteridian by **importing** external catalog data through the block runtime
+(METR-0002, ADR-0007 block dataflow model). This is a **bring your own catalog**
+pattern: the external source is authoritative for product *definition* in the
+customer's organization; Meteridian's catalog is authoritative for *rating
+execution*.
+
+### 12.1 External Sources (Examples, Not Dependencies)
+
+| Source | What it provides | Maturity / fit |
+|--------|------------------|----------------|
+| **[DCM Catalog Manager](https://github.com/dcm-project/catalog-manager)** | REST API for service types, catalog items, and instances — a hierarchical model for infrastructure service definitions (AEP-style, OpenAPI-driven). Aligns with sovereign/on-prem "data center as code" goals. | Early-stage open source (Go); focused on *provisioning* catalog semantics, not telco billing. Useful as a **reference adapter** for importing service SKUs into Meteridian plans. |
+| **[OSAC](https://github.com/osac-project)** (Open Sovereign AI Cloud) | Self-service provisioning framework for OpenShift clusters and VMs — fulfillment APIs, operators, Ansible playbooks. Not a billing or product-catalog product. | Production-oriented at [Mass Open Cloud](https://massopen.cloud/); OSAC is an **infrastructure automation** stack, not an accounting catalog. Meteridian can consume OSAC *resource metadata* (cluster templates, VM SKUs) via custom sync blocks. |
+| **TM Forum SID / TMF620** | Telecom industry product catalog vocabulary and REST patterns. | Meteridian's Catalog API already aligns TMF620 terminology (see [§10.4](#104-tmf620-alignment)). External TMF620 catalogs can map to Meteridian's flatter model. |
+| **Stripe Products, ERP, custom YAML** | Commercial product master data. | Common in hybrid deployments; import via Source or Transform blocks. |
+
+None of these are hard dependencies. They illustrate that **any system exposing
+product or service definitions** (REST, GraphQL, GitOps files, message streams)
+can feed Meteridian through a sync block.
+
+### 12.2 Sync via Block Flow (Not Live Pass-Through)
+
+Catalog integration follows the same block extensibility model as metering
+pipelines (ADR-0007):
+
+```mermaid
+flowchart LR
+    subgraph External["External systems (examples)"]
+        DCM["DCM Catalog Manager"]
+        ERP["ERP / Stripe / TMF620"]
+        OSAC["OSAC fulfillment API"]
+    end
+    Source["Source block<br/>(poll / webhook)"]
+    Transform["Transform block<br/>(map to canonical model)"]
+    CatalogAPI["Catalog API"]
+    PG[("PostgreSQL<br/>catalog schema")]
+    Valkey["Valkey cache<br/>+ pub/sub"]
+    Rater["Rating block<br/>(hot path)"]
+
+    DCM & ERP & OSAC --> Source
+    Source --> Transform
+    Transform --> CatalogAPI
+    CatalogAPI --> PG
+    CatalogAPI --> Valkey
+    Valkey --> Rater
+```
+
+**Design rules:**
+
+1. **Periodic or event-driven sync**, not per-event pass-through. A scheduled
+   Source block (cron) or webhook-triggered Transform block pulls changes from
+   the external catalog and upserts into Meteridian's `catalog.*` tables via the
+   Catalog API (preserving effective dating and audit log semantics from
+   [§7](#7-effective-dating-and-backdating)).
+
+2. **Canonical model on write.** External entities map to Meteridian's
+   Product → Plan → Charge → Tier → Price Book hierarchy (see
+   [§3](#3-catalog-data-model)). Field mapping lives in the Transform block
+   configuration (`block.toml` manifest, per METR-0002).
+
+3. **Cache warm on change.** Successful imports emit `catalog.changed` on
+   Valkey Pub/Sub so rating blocks invalidate local cache entries (see
+   [§11.2](#112-catalog-cache)) before the next billing period.
+
+4. **Idempotent imports.** Re-running a sync block with the same external
+   revision must not create duplicate catalog versions; correlation IDs link
+   bulk imports in `catalog.audit_log`.
+
+### 12.3 Example: DCM Service Type to Meteridian Plan
+
+DCM's `ServiceType` + `CatalogItem` model describes *what can be provisioned*
+(CPU count, memory, GPU). A Transform block might map:
+
+| DCM concept | Meteridian entity |
+|-------------|-------------------|
+| `ServiceType` (e.g. `compute.small`) | `Product` or `ResourceType` registration |
+| `CatalogItem` (priced SKU) | `Plan` + `Charge` with `per_unit` or `tiered` model |
+| `CatalogItemInstance` (provisioned resource) | Subscription linkage (tenant + plan), not catalog row |
+
+Pricing on the DCM side (if any) becomes `PriceBookEntry` rows in the tenant's
+settlement currency. DCM remains the provisioning catalog; Meteridian remains
+the rating catalog.
+
+### 12.4 Example: OSAC Template Metadata
+
+OSAC does not ship rate plans. A Source block can read OSAC fulfillment API
+responses (cluster templates, VM flavors) and register corresponding
+`resource_type_mappings` ([§4.3](#43-provider-mappings)) so pod/VM usage events
+normalize to canonical quantities before rating. Product marketing names and
+commercial rates still live in Meteridian's catalog — OSAC supplies *capacity
+semantics*, not prices.
+
+### 12.5 Open Integration Points
+
+- **`POST /api/v1/catalog/import`** (see [§10.2](#102-endpoints)) accepts JSON
+  snapshots for bulk load; sync blocks may call this or use finer-grained CRUD.
+- **Custom Transform blocks** for exotic sources (SAP, Salesforce CPQ) without
+  upstream Meteridian changes — consistent with METR-0002's `block.toml`
+  contract.
+- **Webhook sink blocks** can push catalog change notifications back to external
+  systems after Meteridian-side amendments (optional reverse sync).
+
+---
+
+## 13. Open Questions
+
+### 13.1 Catalog Storage Engine
 
 **Question:** Should the catalog be stored in PostgreSQL (relational, strong
 consistency, mature tooling) or TimescaleDB (time-series, native temporal
@@ -1561,7 +1683,7 @@ queries, hypertables for effective dating)?
 The catalog is low-volume, high-consistency data. Effective dating can be
 implemented with standard B-tree indexes on `(effective_start, effective_end)`.
 
-### 12.2 Multi-Region Catalog Sync
+### 13.2 Multi-Region Catalog Sync
 
 **Question:** How should catalog data be synchronized across regions in a
 multi-region deployment?
@@ -1579,7 +1701,7 @@ multi-region deployment?
 (pricing changes happen weekly or monthly, not per-second), so the latency of
 cross-region replication is acceptable.
 
-### 12.3 Catalog Cache Granularity
+### 13.3 Catalog Cache Granularity
 
 **Question:** What is the optimal caching granularity for catalog data in
 Valkey?
@@ -1597,7 +1719,7 @@ infrequently enough that caching resolved plans per-tenant would waste memory.
 Resolution (evaluating inheritance, applying overrides) is a lightweight
 operation that can happen in-process.
 
-### 12.4 Charge Model Extensibility
+### 13.4 Charge Model Extensibility
 
 **Question:** Should the set of charge models (flat, per_unit, tiered, volume,
 staircase, percentage, package, usage_minimum) be fixed or extensible?
@@ -1613,7 +1735,7 @@ arbitrary pricing logic.
 **Current leaning:** Fixed set for v1, with the escape hatch being a custom
 rating block in the pipeline for exotic pricing models.
 
-### 12.5 Catalog Versioning Semantics
+### 13.5 Catalog Versioning Semantics
 
 **Question:** When a plan is updated, should the new version automatically apply
 to new subscriptions, or should it require explicit activation?
@@ -1625,7 +1747,7 @@ changes from affecting new customers.
 
 ---
 
-## 13. References
+## 14. References
 
 1. **Zuora Product Catalog API** — https://developer.zuora.com/docs/api-references/api/overview/
    - Industry-standard hierarchical catalog model (Product → Rate Plan → Rate Plan Charge → Tier).
@@ -1667,3 +1789,11 @@ changes from affecting new customers.
 9. **European Central Bank Exchange Rates** — https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/
    - Reference exchange rates for EUR-based conversions.
    - Free, daily-updated, widely used as a billing baseline.
+
+10. **DCM Project (Data Center Management)** — https://dcm-project.github.io/
+    - Open-source service catalog for infrastructure (Catalog Manager API).
+    - Example external source for sync blocks; not a billing catalog.
+
+11. **OSAC (Open Sovereign AI Cloud)** — https://github.com/osac-project
+    - Sovereign AI cloud provisioning framework (OpenShift/VM fulfillment).
+    - Infrastructure metadata source, not a product-rate catalog.

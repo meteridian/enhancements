@@ -165,16 +165,10 @@ Three technology shifts make this architecture viable in 2026:
 A **processing block** is the atomic unit of computation in Meteridian. Every
 block implements a uniform interface:
 
-```
-                 ┌─────────────────────────┐
-  Arrow          │                         │          Arrow
-  RecordBatch ──►│    Processing Block     │──►  RecordBatch
-  (input)        │                         │          (output)
-                 │  - Config (TOML)        │
-                 │  - State (optional)     │
-                 │  - Metrics (OTel)       │
-                 │  - Health (/healthz)    │
-                 └─────────────────────────┘
+```mermaid
+flowchart LR
+    Input["Arrow RecordBatch\n(input)"] --> PB["Processing Block\n\n- Config (TOML)\n- State (optional)\n- Metrics (OTel)\n- Health (/healthz)"]
+    PB --> Output["Arrow RecordBatch\n(output)"]
 ```
 
 Blocks are pure data transformations with explicit inputs, outputs, and side
@@ -187,57 +181,49 @@ Five fundamental block types cover all dataflow patterns:
 
 **Source blocks** produce events. They are the entry points of a pipeline.
 
+```mermaid
+flowchart LR
+    Source["Source\n\n(collector,\nimporter,\ngenerator)"] --> Output["Arrow RecordBatch"]
 ```
-  ┌──────────────┐
-  │   Source      │──► Arrow RecordBatch
-  │              │
-  │ (collector,  │    No input ports.
-  │  importer,   │    One or more output ports.
-  │  generator)  │
-  └──────────────┘
-```
+
+No input ports. One or more output ports.
 
 Examples: Prometheus collector, CloudEvents receiver, CSV importer, Kafka
 consumer, S3 bucket watcher.
 
 **Transform blocks** modify, enrich, filter, or aggregate events.
 
+```mermaid
+flowchart LR
+    Input["Arrow RecordBatch"] --> Transform["Transform\n\n(enrich, filter,\naggregate, rate)"]
+    Transform --> Output["Arrow RecordBatch"]
 ```
-  Arrow RecordBatch ──►┌──────────────┐──► Arrow RecordBatch
-                       │  Transform   │
-                       │              │
-                       │ (enrich,     │    One input port.
-                       │  filter,     │    One output port.
-                       │  aggregate,  │
-                       │  rate)       │
-                       └──────────────┘
-```
+
+One input port. One output port.
 
 Examples: geo-enricher, tiered rater, tag normalizer, unit converter,
 deduplicator, windowed aggregator, payment provider (request-response).
 
 **Sink blocks** consume events. They are the terminal nodes of a pipeline.
 
+```mermaid
+flowchart LR
+    Input["Arrow RecordBatch"] --> Sink["Sink\n\n(storage, export,\nwebhook)"]
 ```
-  Arrow RecordBatch ──►┌──────────────┐
-                       │    Sink      │    No output ports.
-                       │              │    One input port.
-                       │ (storage,    │
-                       │  export,     │
-                       │  webhook)    │
-                       └──────────────┘
-```
+
+No output ports. One input port.
 
 Examples: TimescaleDB writer, S3 Parquet exporter, webhook emitter, audit log
 writer, data lake archiver.
 
 **Fork blocks** duplicate events to multiple downstream paths.
 
-```
-                       ┌──────────────┐──► Path A
-  Arrow RecordBatch ──►│    Fork      │──► Path B
-                       │              │──► Path C
-                       └──────────────┘
+```mermaid
+flowchart LR
+    Input["Arrow RecordBatch"] --> Fork["Fork"]
+    Fork --> A["Path A"]
+    Fork --> B["Path B"]
+    Fork --> C["Path C"]
 ```
 
 Fork blocks perform zero-copy duplication using Arrow's reference-counted
@@ -246,11 +232,12 @@ duplication.
 
 **Join blocks** merge events from multiple upstream paths.
 
-```
-  Path A ──►┌──────────────┐
-  Path B ──►│    Join      │──► Arrow RecordBatch
-  Path C ──►│              │
-            └──────────────┘
+```mermaid
+flowchart LR
+    A["Path A"] --> Join["Join"]
+    B["Path B"] --> Join
+    C["Path C"] --> Join
+    Join --> Output["Arrow RecordBatch"]
 ```
 
 Join blocks support merge (interleave), union (concatenate schemas), and
@@ -260,19 +247,16 @@ temporal join (align by timestamp) strategies.
 
 Every block follows a deterministic lifecycle:
 
-```
-  ┌──────┐     ┌───────┐     ┌────────────┐     ┌──────────┐     ┌─────────┐
-  │ Init │────►│ Ready │────►│ Processing │────►│ Draining │────►│ Stopped │
-  └──────┘     └───────┘     └────────────┘     └──────────┘     └─────────┘
-     │                             │                   │
-     │  Load config, validate      │  Handle batches   │  Flush buffers,
-     │  schemas, acquire           │  Emit metrics     │  close connections,
-     │  capabilities               │  Report health    │  persist state
-     │                             │                   │
-     ▼                             ▼                   ▼
-   Error ◄─────────────────── Error ◄──────────── Error
-   (config invalid,          (processing         (flush failed,
-    capability denied)        failure)             timeout)
+```mermaid
+stateDiagram-v2
+    [*] --> Init
+    Init --> Ready : Load config, validate schemas,\nacquire capabilities
+    Ready --> Processing
+    Processing --> Draining : Pipeline stop or block update
+    Draining --> Stopped : Flush buffers, close connections,\npersist state
+    Init --> Error : config invalid,\ncapability denied
+    Processing --> Error : processing failure
+    Draining --> Error : flush failed, timeout
 ```
 
 - **Init**: The platform loads the block's configuration, validates input/output
@@ -429,30 +413,14 @@ spec:
 
 The resulting pipeline DAG:
 
-```
-  ┌─────────────────┐     ┌───────────────┐     ┌────────────────┐
-  │ ocp-collector   │────►│ geo-enricher  │────►│ tag-normalizer │
-  │ (source)        │     │ (transform)   │     │ (transform)    │
-  └─────────────────┘     └───────────────┘     └────────────────┘
-                                                        │
-                                                        ▼
-                                                 ┌─────────────┐
-                                                 │ cost-rater  │
-                                                 │ (transform) │
-                                                 └──────┬──────┘
-                                                        │
-                                                        ▼
-                                                 ┌─────────────┐
-                                                 │ cost-fork   │
-                                                 │ (fork)      │
-                                                 └──┬───────┬──┘
-                                                    │       │
-                                          ┌─────────┘       └─────────┐
-                                          ▼                           ▼
-                                   ┌──────────────┐           ┌──────────────┐
-                                   │ timescale-   │           │ invoice-     │
-                                   │ sink         │           │ sink         │
-                                   └──────────────┘           └──────────────┘
+```mermaid
+flowchart TD
+    A["ocp-collector\n(source)"] --> B["geo-enricher\n(transform)"]
+    B --> C["tag-normalizer\n(transform)"]
+    C --> D["cost-rater\n(transform)"]
+    D --> E["cost-fork\n(fork)"]
+    E --> F["timescale-sink\n(sink)"]
+    E --> G["invoice-sink\n(sink)"]
 ```
 
 ### 4.2 CUE for Type Safety
@@ -510,20 +478,19 @@ Apache Arrow is the **single serialization format** for all data exchange in
 Meteridian. This is a deliberate, opinionated choice that eliminates an entire
 category of complexity: format conversion.
 
+```mermaid
+flowchart TB
+    subgraph ArrowEverywhere["Arrow Everywhere"]
+        direction LR
+        B1["Block"] <-- "Arrow Flight RPC (v1)" --> B2["Block"]
+        B3["Block"] <-- "Arrow IPC · shared mem (v2)" --> B4["WASM Block"]
+        B5["Block"] <-- "Arrow RecordBatch (v1)" --> S["Storage\n(Parquet)"]
+        API["API"] <-- "Arrow Flight SQL (v1)" --> QE["Query Engine"]
+    end
 ```
-  ┌─────────────────────────────────────────────────────────────┐
-  │                    Arrow Everywhere                         │
-  │                                                             │
-  │  Block ◄──Arrow Flight RPC──► Block              (v1)      │
-  │  Block ◄──Arrow IPC (shared mem)──► WASM Block   (v2)      │
-  │  Block ◄──Arrow RecordBatch──► Storage (Parquet)  (v1)     │
-  │  API   ◄──Arrow Flight SQL──► Query Engine        (v1)     │
-  │                                                             │
-  │  One developer-facing format. One schema. Zero conversion.  │
-  │  (Arrow Flight uses Protobuf internally for control plane   │
-  │   — hidden from block developers by the Flight SDK.)        │
-  └─────────────────────────────────────────────────────────────┘
-```
+
+> One developer-facing format. One schema. Zero conversion.
+> (Arrow Flight uses Protobuf internally for control plane — hidden from block developers by the Flight SDK.)
 
 ### 5.2 Arrow Flight RPC for Block-to-Block Communication
 
@@ -545,18 +512,18 @@ workloads.
 
 For block-to-block communication in gRPC out-of-process mode:
 
+```mermaid
+flowchart LR
+    subgraph Go["Block A (Go)"]
+        PA["Process\nbatch"]
+    end
+    subgraph Python["Block B (Python)"]
+        PB["Process\nbatch"]
+    end
+    PA -->|"Arrow Flight\nRecordBatch as Arrow IPC\nover gRPC stream"| PB
 ```
-  Block A (Go)                    Block B (Python)
-  ┌──────────┐                    ┌──────────┐
-  │ Process  │   Arrow Flight     │ Process  │
-  │ batch    │──────────────────► │ batch    │
-  │          │  RecordBatch sent  │          │
-  │          │  as Arrow IPC      │          │
-  │          │  over gRPC stream  │          │
-  └──────────┘                    └──────────┘
 
-  Block authors write Arrow code only. No Protobuf schema. No codegen.
-```
+> Block authors write Arrow code only. No Protobuf schema. No codegen.
 
 Key advantages over writing raw gRPC + Protobuf services:
 
@@ -582,23 +549,23 @@ Key advantages over writing raw gRPC + Protobuf services:
 WASM blocks will run in-process but in a sandboxed memory space. Data crosses
 the WASM boundary via Arrow IPC format over shared memory:
 
+```mermaid
+flowchart LR
+    subgraph Host["Host Process"]
+        H_In["Arrow\nRecordBatch"]
+        H_Out["Arrow\nRecordBatch"]
+    end
+    subgraph WASM["WASM Sandbox"]
+        W_In["Arrow\nRecordBatch"]
+        W_Process["Process..."]
+        W_Out["Arrow\nRecordBatch"]
+        W_In --> W_Process --> W_Out
+    end
+    H_In -->|"shared mem (IPC)"| W_In
+    W_Out -->|"shared mem (IPC)"| H_Out
 ```
-  Host Process                    WASM Sandbox
-  ┌──────────────────┐           ┌──────────────────┐
-  │                  │           │                  │
-  │  Arrow           │  shared   │  Arrow           │
-  │  RecordBatch ────┼── mem ───►│  RecordBatch     │
-  │                  │  (IPC)    │                  │
-  │                  │           │  Process...      │
-  │                  │           │                  │
-  │  Arrow       ◄───┼── mem ───┤  Arrow           │
-  │  RecordBatch     │  (IPC)    │  RecordBatch     │
-  │                  │           │                  │
-  └──────────────────┘           └──────────────────┘
 
-  Zero-copy: the WASM guest reads directly from shared memory.
-  No serialization/deserialization per call.
-```
+> Zero-copy: the WASM guest reads directly from shared memory. No serialization/deserialization per call.
 
 The Extism WASM runtime provides shared memory regions that both host and guest
 can access. Arrow IPC format is a simple framing of Arrow RecordBatches that can
@@ -655,19 +622,14 @@ Arrow's columnar layout enables a powerful security feature: **field-level
 access control**. Because each column is a separate buffer, the platform can
 expose only the columns that a block has declared in its capabilities:
 
+```mermaid
+flowchart TD
+    Full["Full RecordBatch (platform)\ntenant_id · user_id · source_ip · timestamp · amount"]
+    Projected["Block sees (fields.read)\nsource_ip · timestamp"]
+    Full -->|"Schema projection"| Projected
 ```
-  Full RecordBatch (platform):
-  ┌───────────┬──────────┬────────────┬─────────────┬───────────┐
-  │ tenant_id │ user_id  │ source_ip  │ timestamp   │ amount    │
-  └───────────┴──────────┴────────────┴─────────────┴───────────┘
 
-  Block sees (declared fields.read = ["source_ip", "timestamp"]):
-  ┌────────────┬─────────────┐
-  │ source_ip  │ timestamp   │
-  └────────────┴─────────────┘
-
-  The block physically cannot access tenant_id, user_id, or amount.
-```
+> The block physically cannot access `tenant_id`, `user_id`, or `amount`.
 
 This is enforced at the Arrow schema level: the platform constructs a projected
 RecordBatch containing only the permitted columns before passing it to the
@@ -684,32 +646,19 @@ All runtimes implement the same logical interface — receive Arrow RecordBatche
 process them, emit Arrow RecordBatches. The choice of runtime determines the
 performance/isolation trade-off. See ADR-0006 for the phasing rationale.
 
-```
-  ┌───────────────────────────────────────────────────────────────────┐
-  │                         Meteridian Process                        │
-  │                                                                   │
-  │  v1.0 ─────────────────────────────────────────────────────────── │
-  │  ┌─────────────┐                    ┌─────────────────────┐       │
-  │  │  Go SDK     │                    │  gRPC Stub          │       │
-  │  │  Block A    │                    │  (Arrow Flight      │       │
-  │  │             │                    │   client to         │       │
-  │  │  In-process │                    │   external Block C) │       │
-  │  │  No barrier │                    │                     │       │
-  │  │             │                    │  ┌─ ─ ─ ─ ─ ─ ─ ┐  │       │
-  │  └─────────────┘                    │    Block C        │       │
-  │                                     │  │ (Python, Java, │  │      │
-  │  v2.0 (planned) ──────────────      │    Rust, etc.)    │       │
-  │  ┌──────────────────┐              │  └─ ─ ─ ─ ─ ─ ─ ┘  │       │
-  │  │  WASM (Extism)   │              └─────────────────────┘       │
-  │  │  ┌────────────┐  │                                            │
-  │  │  │ Block B    │  │                                            │
-  │  │  │ Sandboxed  │  │                                            │
-  │  │  │ Memory     │  │                                            │
-  │  │  └────────────┘  │                                            │
-  │  │  Arrow IPC       │                                            │
-  │  │  shared memory   │                                            │
-  │  └──────────────────┘                                            │
-  └───────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph MP["Meteridian Process"]
+        subgraph V1["v1.0"]
+            GoSDK["Go SDK · Block A\nIn-process · No barrier"]
+            gRPCStub["gRPC Stub\n(Arrow Flight client)"]
+            BlockC["Block C\n(Python, Java, Rust, etc.)"]
+            gRPCStub -.->|"Arrow Flight"| BlockC
+        end
+        subgraph V2["v2.0 (planned)"]
+            WASM["WASM (Extism)\nBlock B · Sandboxed Memory\nArrow IPC shared memory"]
+        end
+    end
 ```
 
 ### 6.2 Go SDK (Native)
@@ -914,29 +863,26 @@ if __name__ == "__main__":
 
 **v1 (Go SDK + gRPC only):**
 
-```
-  Is this a core Meteridian block?
-  ├── Yes → Go SDK (Tier 3)
-  └── No
-      ├── Is this a Verified Partner (Tier 2) wanting in-process performance?
-      │   └── Yes → Go SDK (after code review + security audit)
-      ├── Does it need GPU?
-      │   └── Yes → gRPC (separate container with GPU access)
-      └── No → gRPC (Arrow Flight) — marketplace tiers 0-2
+```mermaid
+flowchart TD
+    Q1{"Core Meteridian\nblock?"} -->|Yes| GoSDK1["Go SDK\n(Tier 3)"]
+    Q1 -->|No| Q2{"Verified Partner (Tier 2)\nwanting in-process?"}
+    Q2 -->|Yes| GoSDK2["Go SDK\n(after code review +\nsecurity audit)"]
+    Q2 -->|No| Q3{"Needs GPU?"}
+    Q3 -->|Yes| gRPCGPU["gRPC\n(separate container\nwith GPU access)"]
+    Q3 -->|No| gRPC["gRPC (Arrow Flight)\nmarketplace tiers 0-2"]
 ```
 
 **v2+ (Go SDK + gRPC + WASM):**
 
-```
-  Is this a core Meteridian block?
-  ├── Yes → Go SDK (Tier 3)
-  └── No
-      ├── Does it need Python/Java/full runtime or GPU?
-      │   └── Yes → gRPC (Arrow Flight)
-      └── No
-          ├── Is it a lightweight marketplace block (Tier 0-1)?
-          │   └── Yes → WASM preferred (lower overhead, better density)
-          └── No → gRPC or WASM (developer choice)
+```mermaid
+flowchart TD
+    Q1{"Core Meteridian\nblock?"} -->|Yes| GoSDK["Go SDK\n(Tier 3)"]
+    Q1 -->|No| Q2{"Needs Python/Java/\nfull runtime or GPU?"}
+    Q2 -->|Yes| gRPC["gRPC\n(Arrow Flight)"]
+    Q2 -->|No| Q3{"Lightweight marketplace\nblock (Tier 0-1)?"}
+    Q3 -->|Yes| WASM["WASM preferred\n(lower overhead,\nbetter density)"]
+    Q3 -->|No| Choice["gRPC or WASM\n(developer choice)"]
 ```
 
 ---
@@ -949,23 +895,16 @@ Every block is automatically instrumented with OpenTelemetry. The platform
 injects tracing, metrics, and logging without requiring block authors to write
 instrumentation code.
 
+```mermaid
+flowchart LR
+    subgraph Pipeline["Pipeline: ocp-cost-enrichment"]
+        A["collector\np50: 45ms · p99: 120ms\n1.2k rec/s · err: 0.01%"] -->|"3.2ms"| B["enricher\np50: 2.1ms · p99: 8.5ms\n1.2k rec/s · err: 0.1%"]
+        B -->|"0.8ms"| C["rater\np50: 0.3ms · p99: 1.2ms\n1.2k rec/s · err: 0%"]
+    end
 ```
-  ┌──────────────────────────────────────────────────────────────┐
-  │  Pipeline: ocp-cost-enrichment                                │
-  │                                                               │
-  │  ┌─────────┐  3.2ms  ┌──────────┐  0.8ms  ┌──────────┐     │
-  │  │collector│────────►│enricher  │────────►│ rater    │     │
-  │  │         │         │          │         │          │     │
-  │  │ p50: 45ms│        │ p50: 2.1ms│        │ p50: 0.3ms│    │
-  │  │ p99: 120ms│       │ p99: 8.5ms│        │ p99: 1.2ms│    │
-  │  │ 1.2k rec/s│       │ 1.2k rec/s│        │ 1.2k rec/s│    │
-  │  │ err: 0.01%│       │ err: 0.1% │        │ err: 0%   │    │
-  │  └─────────┘         └──────────┘         └──────────┘     │
-  │                                                               │
-  │  Pipeline throughput: 1,200 records/sec                       │
-  │  End-to-end latency: p50=48ms, p95=85ms, p99=130ms          │
-  └──────────────────────────────────────────────────────────────┘
-```
+
+> Pipeline throughput: 1,200 records/sec
+> End-to-end latency: p50=48ms, p95=85ms, p99=130ms
 
 ### 7.2 Per-Block Metrics
 
@@ -995,12 +934,10 @@ Meteridian uses the OpenTelemetry Collector's SpanMetricsConnector to derive
 RED metrics (Rate, Error, Duration) from traces without requiring explicit
 metric instrumentation:
 
-```
-  Block traces ──► OTel Collector ──► SpanMetricsConnector ──► Prometheus/Mimir
-                                           │
-                                           ├── calls_total (rate)
-                                           ├── duration_bucket (latency histogram)
-                                           └── errors_total (error count)
+```mermaid
+flowchart LR
+    A["Block traces"] --> B["OTel Collector"] --> C["SpanMetricsConnector"]
+    C -->|"calls_total (rate)\nduration_bucket (histogram)\nerrors_total (error count)"| D["Prometheus/Mimir"]
 ```
 
 This means block authors get full observability for free — the platform extracts
@@ -1057,20 +994,9 @@ debug, and optimize pipelines through natural language.
 
 This is not "AI as an afterthought" — it is the primary interaction model:
 
-```
-  ┌──────────────┐     MCP/A2A     ┌───────────────────┐
-  │  AI Agent    │◄───────────────►│  Meteridian       │
-  │  (Claude,    │                 │  MCP Server +     │
-  │   ChatGPT,   │  "Create a     │  A2A Agent        │
-  │   Cursor,    │   pipeline     │                   │
-  │   Kimi)      │   that..."     │  Tools:           │
-  │              │                 │  - list_blocks    │
-  │              │                 │  - create_block   │
-  │              │                 │  - create_pipeline│
-  │              │                 │  - optimize_pipe  │
-  │              │                 │  - debug_block    │
-  │              │                 │  - get_metrics    │
-  └──────────────┘                 └───────────────────┘
+```mermaid
+flowchart LR
+    Agent["AI Agent\n(Claude, ChatGPT,\nCursor, Kimi)"] <-->|"MCP / A2A\n'Create a pipeline that...'"| Server["Meteridian\nMCP Server + A2A Agent\n\nTools:\nlist_blocks · create_block\ncreate_pipeline · optimize_pipe\ndebug_block · get_metrics"]
 ```
 
 ### 8.2 Model Context Protocol (MCP)
@@ -1261,17 +1187,10 @@ Tier upgrades require:
 Every block published to the marketplace goes through a supply chain security
 pipeline:
 
-```
-  Developer                  Build System              Marketplace
-  ┌─────────┐               ┌──────────────┐          ┌──────────────┐
-  │ Source   │──── push ────►│ CI/CD        │          │              │
-  │ code     │               │              │          │  Verify:     │
-  │          │               │ 1. Build     │          │  - Signature │
-  │          │               │ 2. Test      │── pub ──►│  - SLSA      │
-  │          │               │ 3. Sign      │          │  - Vuln scan │
-  │          │               │ 4. Attest    │          │  - Schema    │
-  │          │               │ 5. Scan      │          │              │
-  └─────────┘               └──────────────┘          └──────────────┘
+```mermaid
+flowchart LR
+    Dev["Developer\nSource code"] -->|push| CI["CI/CD\n\n1. Build\n2. Test\n3. Sign\n4. Attest\n5. Scan"]
+    CI -->|publish| MP["Marketplace\n\nVerify:\n- Signature\n- SLSA\n- Vuln scan\n- Schema"]
 ```
 
 **SLSA (Supply-chain Levels for Software Artifacts):**
@@ -1337,27 +1256,17 @@ infrastructure, not customer-facing.
 How Meteridian customers bill their own end users for metered usage. This is a
 pluggable block interface that customers choose and configure.
 
-```
-  Dimension 1: Marketplace                Dimension 2: Customer Billing
-  ┌──────────────────────────┐           ┌──────────────────────────┐
-  │  Block Developer         │           │  Meteridian Customer     │
-  │        │                 │           │        │                 │
-  │        │ publishes block │           │        │ rated usage     │
-  │        ▼                 │           │        ▼                 │
-  │  ┌──────────┐            │           │  ┌──────────────────┐   │
-  │  │Marketplace│           │           │  │ Payment Provider │   │
-  │  │          │            │           │  │ Block            │   │
-  │  └────┬─────┘            │           │  │ (Stripe, Paddle, │   │
-  │       │                  │           │  │  Adyen, custom)  │   │
-  │       ▼                  │           │  └────────┬─────────┘   │
-  │  ┌──────────┐            │           │           │             │
-  │  │ Paddle   │            │           │           ▼             │
-  │  │ (MoR)    │            │           │  ┌──────────────────┐   │
-  │  └────┬─────┘            │           │  │ End User         │   │
-  │       │ payout           │           │  │ (invoice + pay)  │   │
-  │       ▼                  │           │  └──────────────────┘   │
-  │  Developer bank account  │           │                         │
-  └──────────────────────────┘           └──────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph D1["Dimension 1: Marketplace"]
+        BD["Block Developer"] -->|"publishes block"| MKT["Marketplace"]
+        MKT --> Paddle["Paddle (MoR)"]
+        Paddle -->|"payout"| Bank["Developer\nbank account"]
+    end
+    subgraph D2["Dimension 2: Customer Billing"]
+        Cust["Meteridian Customer"] -->|"rated usage"| PPB["Payment Provider Block\n(Stripe, Paddle,\nAdyen, custom)"]
+        PPB -->|"invoice + pay"| EU["End User"]
+    end
 ```
 
 ### 10.2 Marketplace Payment Providers
@@ -1452,17 +1361,10 @@ Every block operates under a **deny-by-default** security model. Unless a
 capability is explicitly declared in the block manifest and approved by the
 platform (based on the block's trust tier), the capability is denied.
 
-```
-  ┌──────────────────────────────────────────────────────────┐
-  │  Capability Request Flow                                  │
-  │                                                           │
-  │  Block manifest ──► Platform validator ──► Grant/Deny     │
-  │                          │                                │
-  │                          ├── Check trust tier             │
-  │                          ├── Check capability limits      │
-  │                          ├── Check tenant policy          │
-  │                          └── Log decision (audit trail)   │
-  └──────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    BM["Block manifest"] --> PV["Platform validator"]
+    PV -->|"1. Check trust tier\n2. Check capability limits\n3. Check tenant policy\n4. Log decision (audit trail)"| GD["Grant / Deny"]
 ```
 
 ### 11.2 Capability Categories
@@ -1547,16 +1449,9 @@ By default, blocks are **stateless** — they process each batch independently.
 Some blocks require state (counters, caches, session data, sliding windows). For
 these, the platform provides a managed key-value store:
 
-```
-  ┌──────────────────┐        ┌──────────────────┐
-  │  Block           │        │  State Store     │
-  │                  │◄──────►│                  │
-  │  ctx.State().    │        │  Valkey (fast)   │
-  │    Get("key")    │        │       +          │
-  │    Set("key",v)  │        │  TimescaleDB     │
-  │    Incr("key")   │        │  (persistent)    │
-  │                  │        │                  │
-  └──────────────────┘        └──────────────────┘
+```mermaid
+flowchart LR
+    Block["Block\n\nctx.State().\nGet · Set · Incr"] <-->|"read/write"| Store["State Store\n\nValkey (fast)\n+\nTimescaleDB (persistent)"]
 ```
 
 ### 12.2 State Properties
@@ -1638,10 +1533,14 @@ The following are breaking changes that require a new major version:
 
 ### 13.3 Version Compatibility
 
-```
-  Block A v1.0 ──► Block B v1.0     ✓ Compatible (same schema)
-  Block A v1.1 ──► Block B v1.0     ✓ Compatible (A added nullable col)
-  Block A v2.0 ──► Block B v1.0     ✗ Incompatible (A removed a col)
+```mermaid
+flowchart LR
+    A1["Block A v1.0"] -->|"✓ Compatible\n(same schema)"| B1["Block B v1.0"]
+    A2["Block A v1.1"] -->|"✓ Compatible\n(A added nullable col)"| B2["Block B v1.0 "]
+    A3["Block A v2.0"] -->|"✗ Incompatible\n(A removed a col)"| B3[" Block B v1.0"]
+
+    style A3 stroke:#f44,stroke-width:2px
+    style B3 stroke:#f44,stroke-width:2px
 ```
 
 Each block declares the minimum schema version it supports:
@@ -1687,19 +1586,12 @@ Every error in a block is classified into one of two categories:
 
 When a block crashes (panic, OOM, segfault in WASM):
 
-```
-  ┌──────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-  │Block │     │ Platform │     │ Block    │     │ Block    │
-  │crashes│────►│ detects  │────►│ restarts │────►│ resumes  │
-  │      │     │ health   │     │ (fresh   │     │ from     │
-  │      │     │ failure  │     │  init)   │     │ last     │
-  └──────┘     └──────────┘     └──────────┘     │ checkpoint│
-                     │                            └──────────┘
-                     │
-                     ▼
-               Backpressure
-               applied to
-               upstream blocks
+```mermaid
+flowchart LR
+    Crash["Block\ncrashes"] --> Detect["Platform detects\nhealth failure"]
+    Detect --> Restart["Block restarts\n(fresh init)"]
+    Restart --> Resume["Block resumes\nfrom last checkpoint"]
+    Detect --> BP["Backpressure applied\nto upstream blocks"]
 ```
 
 1. The platform detects the crash via health check failure.
@@ -1798,13 +1690,19 @@ Pipelines support the following live updates without full restart:
 
 ### 15.2 Rolling Updates
 
-```
-  Traffic:  100% v1.0        50% v1.0 / 50% v1.1      100% v1.1
-  ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-  │  [v1.0] ─────►   │     │  [v1.0] ──┐      │     │                  │
-  │                   │ ──► │           ├──►   │ ──► │  [v1.1] ─────►   │
-  │                   │     │  [v1.1] ──┘      │     │                  │
-  └──────────────────┘     └──────────────────┘     └──────────────────┘
+```mermaid
+flowchart LR
+    subgraph S1["100% v1.0"]
+        V1A["v1.0"] --> OUT1[" "]
+    end
+    subgraph S2["50% v1.0 / 50% v1.1"]
+        V1B["v1.0"] --> OUT2[" "]
+        V1C["v1.1"] --> OUT2
+    end
+    subgraph S3["100% v1.1"]
+        V1D["v1.1"] --> OUT3[" "]
+    end
+    S1 -.-> S2 -.-> S3
 ```
 
 ### 15.3 Canary Deployments

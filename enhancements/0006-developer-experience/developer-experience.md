@@ -5,7 +5,7 @@
 - **Created:** 2026-06-18
 - **Last Updated:** 2026-06-18
 - **Depends on:** METR-0002 (Platform Extensibility)
-- **Related:** METR-0003 (Product Catalog), METR-0004 (Credit, Prepaid, and Token Billing), METR-0005 (Internal Budget Units)
+- **Related:** METR-0003 (Product Catalog), METR-0004 (Credit, Prepaid, and Token Billing), METR-0005 (Internal Budget Units), [ADR-0009](../../docs/adr/0009-slsa-sigstore-provenance.md) (SLSA/Sigstore provenance; Konflux/RHTAS deployment profiles)
 
 ---
 
@@ -45,8 +45,9 @@ initial scaffolding to marketplace publication. This enhancement defines:
   single Block Interface Specification.
 - A **testing framework** covering unit, integration, performance, snapshot, and
   contract testing — each with tight CLI integration.
-- **CI/CD integration** via official GitHub Actions, GitLab CI templates, and
-  pre-commit hooks so that block quality gates are automated from day one.
+- **CI/CD integration** via official GitHub Actions (primary documented path),
+  GitLab CI templates, optional Konflux/Tekton for OpenShift, and pre-commit hooks
+  so that block quality gates are automated from day one.
 - **Performance profiling tools** that surface per-block latency, throughput, and
   memory behavior during both local development and production operation.
 - A **documentation suite** — tutorials, API references, cookbooks, and
@@ -915,7 +916,32 @@ variables:
 The template defines `build`, `test`, `bench`, and `publish` stages with sensible
 defaults. Each stage can be overridden or extended.
 
-### 8.3 Pre-Commit Hooks
+### 8.3 Optional: Konflux / Tekton (OpenShift)
+
+Organizations with existing Tekton or [Konflux](https://konflux-ci.dev/docs/trust-model/)
+factories on OpenShift may use them as an alternative to GitHub Actions or GitLab CI.
+This path is optional; GitHub Actions remains the primary documented workflow.
+
+**Provenance:** Tekton Chains generates SLSA provenance attestations. Conforma
+policies (for example `@slsa3`) enforce Build Level 3 requirements before artifacts
+leave the cluster.
+
+**Signing:** Configure cosign to use [Red Hat Trusted Artifact Signer (RHTAS)](https://docs.redhat.com/en/documentation/red_hat_trusted_artifact_signer/)
+or a private Sigstore deployment:
+
+```bash
+export COSIGN_FULCIO_URL=https://fulcio.example.com
+export COSIGN_REKOR_URL=https://rekor.example.com
+export SIGSTORE_ROOT_FILE=/etc/meteridian/tuf/root.json
+```
+
+**Marketplace verification:** The registry verifies in-toto attestations and
+Cosign signatures against tier policy — it does not require that a block was
+"built on Konflux." Any CI that produces equivalent SLSA Build Level 3
+attestations is acceptable. See [ADR-0009](../../docs/adr/0009-slsa-sigstore-provenance.md)
+for deployment profiles and tier mapping.
+
+### 8.4 Pre-Commit Hooks
 
 ```yaml
 # .pre-commit-config.yaml
@@ -1425,10 +1451,17 @@ and emulator integration. JetBrains plugin is a community contribution opportuni
    Supply-chain Levels for Software Artifacts. SLSA provenance attestations are
    generated during `meteridian publish` to establish build integrity.
 
-9. **Apache Arrow** — [arrow.apache.org](https://arrow.apache.org)
+9. **Konflux CI** — [konflux-ci.dev/docs/trust-model](https://konflux-ci.dev/docs/trust-model/)
+   Optional OpenShift/Tekton build path with Tekton Chains provenance and Conforma
+   policy enforcement.
+
+10. **Red Hat Trusted Artifact Signer (RHTAS)** — [Red Hat documentation](https://docs.redhat.com/en/documentation/red_hat_trusted_artifact_signer/)
+    Enterprise Sigstore deployment (Fulcio, Rekor, TUF) for private signing.
+
+11. **Apache Arrow** — [arrow.apache.org](https://arrow.apache.org)
    Columnar in-memory data format. The foundation of Meteridian's data model —
    all block inputs and outputs are Arrow RecordBatches.
 
-10. **OpenTelemetry** — [opentelemetry.io](https://opentelemetry.io)
+12. **OpenTelemetry** — [opentelemetry.io](https://opentelemetry.io)
     Observability framework for traces, metrics, and logs. Each block emits
     OpenTelemetry spans for performance monitoring and debugging.

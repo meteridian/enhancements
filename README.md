@@ -21,6 +21,8 @@ enhancements/
   0001-architecture/     # Foundational architecture design
   0002-feature-name/     # Future enhancements
   ...
+docs/
+  assets/                # Logo and branding assets (SVG and PNG)
 ```
 
 Each enhancement directory contains a `README.md` with the full proposal.

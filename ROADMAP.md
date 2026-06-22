@@ -86,7 +86,7 @@ Target: First usable release with core metering, rating, and billing.
 ### v1.0 Explicitly Excluded
 
 - WASM runtime (deferred to v2, see ADR-0006)
-- DePIN and blockchain tokenomics (deferred to v2, see below)
+- Capacity tokenization (available as custom block, not core — see FR-310)
 - Visual pipeline editor (deferred, AI-first approach covers this)
 - Bin-packing optimization for same-tenant batches (deferred, see ADR-0012)
 
@@ -101,7 +101,6 @@ Target: Marketplace maturity, advanced features, broader ecosystem.
 | ID | Title | Status | Notes |
 |----|-------|--------|-------|
 | METR-TBD | WASM Block Runtime | planned | Adds Extism-based WASM runtime for higher block density (ADR-0006) |
-| METR-TBD | DePIN and Blockchain Tokenomics | planned | Dimension 3: Burn-and-Mint Equilibrium, on-chain settlement, stablecoin payments. See "Deferred: DePIN" below. |
 | METR-TBD | Visual Pipeline Editor | planned | Node-RED-inspired browser UI for pipeline composition |
 | METR-TBD | Multi-Region Federation | planned | Catalog sync, event routing, data residency enforcement |
 | METR-TBD | Advanced Fraud Detection | planned | ML-based anomaly detection blocks for revenue assurance |
@@ -136,54 +135,17 @@ Target: Marketplace maturity, advanced features, broader ecosystem.
 
 ---
 
-## Deferred: DePIN and Blockchain Tokenomics (Dimension 3)
+## Note: Capacity Tokenization
 
-This is the most speculative area of the roadmap. We are honest about what we
-know and what we don't.
+Capacity tokenization (token issuance, burn-and-mint, on-chain settlement) is
+architecturally enabled by Meteridian's block system and event-sourced ledger.
+A community or third-party block could implement this using:
 
-### What It Is
+- Pluggable payment providers (ADR-0010) for crypto payment rails
+- Credit and balance management (METR-0004) for ledger primitives
+- Multi-currency price books (METR-0003) for token-denominated prices
 
-DePIN (Decentralized Physical Infrastructure Networks) uses blockchain tokens
-to incentivize infrastructure providers. Examples: Helium (wireless), Filecoin
-(storage), Render Network (GPU), Akash (compute). The tokenomics model
-typically involves:
-
-- **Burn-and-Mint Equilibrium (BME)**: Service consumers burn tokens to pay for
-  services. The protocol mints new tokens to reward infrastructure providers.
-  The burn rate and mint rate converge toward an equilibrium price.
-- **Staking**: Infrastructure providers stake tokens as collateral for quality
-  of service guarantees.
-- **On-chain settlement**: Usage is metered off-chain, but settlement occurs
-  on-chain via smart contracts.
-- **Stablecoin integration**: Fiat-pegged tokens (USDC, USDT) for price
-  stability in billing contexts.
-
-### Why We Defer
-
-1. **Regulatory uncertainty**: Token classification (utility vs. security) varies
-   by jurisdiction. We don't want to build features that may require redesign
-   when regulations clarify.
-2. **Technical complexity**: On-chain settlement requires blockchain node
-   infrastructure, smart contract development, and bridge integration — each of
-   these is a major project in itself.
-3. **Market validation**: The DePIN market is nascent. We need to validate
-   demand with actual customers before investing.
-4. **Dimension 1 and 2 first**: Credit and prepaid billing and internal budget unit
-   economy serve much larger markets today and share foundational
-   infrastructure (balance management, ledger, credit grants) with DePIN.
-
-### What We Build Now (in v1) That Enables DePIN Later
-
-- Pluggable payment providers (ADR-0010) — can plug in crypto payment rails
-- Credit and balance management (METR-0004) — same ledger model as BME
-- Event-sourced architecture — immutable audit trail needed for on-chain proofs
-- Multi-currency price books (METR-0003) — can add token-denominated prices
-
-### When to Revisit
-
-- When we have a concrete customer request for DePIN metering
-- When regulatory frameworks (MiCA in EU, US stablecoin legislation) stabilize
-- After v1 launch, with real production data on credit and prepaid workloads
+This capability is not on the core roadmap and has no planned METR (see FR-310).
 
 ---
 

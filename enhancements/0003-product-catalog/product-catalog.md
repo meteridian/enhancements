@@ -135,16 +135,15 @@ responsibility:
 
 ```mermaid
 flowchart TD
-    subgraph Catalog["Product Catalog"]
-        Product["Product<br/>Top-level grouping: Compute, Storage, GPU"]
-        Plan["Plan (Rate Plan)<br/>Purchasable bundle; can inherit from parent"]
-        Charge["Charge (Charge Model)<br/>Billable item with charge model"]
-        Tier["Tier<br/>Price bracket, e.g. 0–100 units @ $0.10/unit"]
-        PBE["Price Book Entry<br/>Currency- and region-specific pricing"]
-    end
+    Product["Product<br/>Top-level grouping"]
+    Plan["Plan (Rate Plan)<br/>Purchasable bundle"]
+    Charge["Charge (Charge Model)<br/>Billable item"]
+    Tier["Tier<br/>Price bracket"]
+    PBE["Price Book Entry<br/>Currency/region pricing"]
+
     Product -->|"1:N"| Plan
     Plan -->|"1:N"| Charge
-    Charge -->|"1:N (tiered/volume/staircase)"| Tier
+    Charge -->|"1:N"| Tier
     Tier -->|"N:M"| PBE
 ```
 
@@ -949,15 +948,20 @@ rate plan that was active at the event's timestamp, not the current rate plan.
 This is a critical correctness property.
 
 ```mermaid
-timeline
-    title Late-arriving event rated at event timestamp
-    section Jan 2026 : Rate $0.10
-    section Feb 2026 : Rate $0.08
-        Feb 12 : Usage event (timestamp)
-        Mar 15 : Event arrives (processed)
-        Note : Rated at $0.08 (Feb rate), not $0.06 (Apr current)
-    section Mar 2026 : Rate $0.06
-    section Apr 2026 : Rate $0.06
+flowchart TD
+    R1["Jan 2026<br/>Rate: $0.10"]
+    R2["Feb 2026<br/>Rate: $0.08"]
+    R3["Mar 2026<br/>Rate: $0.06"]
+    R4["Apr 2026<br/>Rate: $0.06 (current)"]
+    R1 --> R2 --> R3 --> R4
+
+    E["Feb 12: Usage event<br/>timestamp in Feb"]
+    P["Mar 15: Event processed<br/>(late arrival)"]
+    OUT["Rated at $0.08<br/>rate active at event timestamp"]
+
+    R2 -.-> E
+    E --> OUT
+    P --> OUT
 ```
 
 ### 7.5 Audit Log

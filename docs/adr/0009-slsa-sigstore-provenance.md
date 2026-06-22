@@ -83,6 +83,39 @@ developer does not publish a patched version, the block is automatically
 delisted from the marketplace (existing installations continue running but
 with a security warning).
 
+## Reference build platforms (non-normative)
+
+Meteridian does not mandate a single CI platform. Marketplace verification is
+attestation-based: the registry checks in-toto provenance and Cosign signatures
+against tier policy, regardless of which build system produced the artifact.
+
+**Default community path:** GitHub Actions or GitLab CI with
+[slsa-github-generator](https://github.com/slsa-framework/slsa-github-generator)
+or GitHub Artifact Attestations, as documented in METR-0006 §8.
+
+**Enterprise/OpenShift path:** [Konflux CI](https://konflux-ci.dev/docs/trust-model/)
+(Tekton Chains for SLSA provenance, Conforma `@slsa3` policy enforcement) with
+[Red Hat Trusted Artifact Signer (RHTAS)](https://docs.redhat.com/en/documentation/red_hat_trusted_artifact_signer/)
+or a privately deployed Sigstore stack for signing.
+
+**"SLSA 3+" in Meteridian tiers** means SLSA Build Level 3 plus Meteridian team
+review and audit — it is **not** an official SLSA level designation. The SLSA Build
+track defines levels 1–3; Level 4 is a separate aspiration and is not required for
+any Meteridian tier today.
+
+## Deployment profiles
+
+| Profile | Signing & trust | Typical CI |
+|---------|----------------|------------|
+| **Community** | Public Sigstore (Fulcio, Rekor); OIDC from GitHub/GitLab | GitHub Actions, GitLab CI |
+| **Enterprise** | RHTAS or private Sigstore on OpenShift | Konflux, self-hosted Tekton |
+| **Regulated / air-gap** | RHTAS or [sigstore/scaffolding](https://github.com/sigstore/scaffolding); cosign with BYOPKI/KMS; offline TUF root distribution | On-cluster Konflux/Tekton; no external Rekor |
+
+RHTAS is Red Hat's supported deployment of the same Sigstore components this ADR
+specifies (Fulcio, Rekor, TUF). Enterprise and regulated deployments use identical
+marketplace verification rules; only the trust roots and certificate authorities
+differ.
+
 ## Consequences
 
 ### Positive
@@ -117,11 +150,12 @@ with a security warning).
 
 ### Negative
 
-- **SLSA Level 3 is hard**: Reproducible builds require deterministic
-  toolchains, pinned dependencies, and hermetic build environments. Most
-  developers have never built reproducible binaries. Meteridian must provide
-  build templates (GitHub Actions workflows, CI/CD configs) that achieve
-  SLSA Level 3 out of the box to make this practical.
+- **SLSA Build Level 3 still requires investment**: Reproducible builds need
+  deterministic toolchains, pinned dependencies, and hermetic build environments.
+  Meteridian lowers the barrier with reference templates — [slsa-github-generator](https://github.com/slsa-framework/slsa-github-generator)
+  and GitHub Artifact Attestations for community CI, Konflux (Tekton Chains +
+  Conforma `@slsa3`) for OpenShift factories — rather than inventing L3
+  provenance from scratch.
 
 - **Sigstore infrastructure dependency**: Fulcio and Rekor are external
   services operated by the Sigstore project. If these services experience
@@ -209,3 +243,5 @@ transparency log, which Notary v2 does not.
 - [Trivy](https://trivy.dev/) — Comprehensive vulnerability scanner
 - [Grype](https://github.com/anchore/grype) — Vulnerability scanner for containers and filesystems
 - [SLSA GitHub Actions Generator](https://github.com/slsa-framework/slsa-github-generator) — SLSA provenance for GitHub Actions
+- [Konflux trust model](https://konflux-ci.dev/docs/trust-model/) — Tekton Chains and Conforma policy enforcement
+- [Red Hat Trusted Artifact Signer](https://docs.redhat.com/en/documentation/red_hat_trusted_artifact_signer/) — Enterprise Sigstore deployment

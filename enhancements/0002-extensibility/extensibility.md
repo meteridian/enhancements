@@ -1220,6 +1220,13 @@ rationale, alternatives analysis, and tier-to-SLSA-level mapping.
   (existing installations continue running but with a security warning in the
   pipeline dashboard)
 
+Build hardening templates are documented in [METR-0006 §8](../0006-developer-experience/developer-experience.md)
+(GitHub Actions, GitLab CI, and optional Konflux/Tekton for OpenShift) and
+verification rules in [ADR-0009](../../docs/adr/0009-slsa-sigstore-provenance.md).
+OpenShift/Konflux builders are supported when they produce equivalent SLSA Build
+Level 3 attestations; the marketplace verifies attestations, not which CI platform
+ran the build.
+
 ### 9.3 Marketplace Revenue Model
 
 | Aspect | Detail |

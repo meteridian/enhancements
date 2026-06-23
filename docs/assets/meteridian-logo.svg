@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#00BFA6"/>
+      <stop offset="50%" stop-color="#00B0D8"/>
+      <stop offset="100%" stop-color="#2962FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left arm: thick stroke rising from bottom-center to upper-left with arrowhead -->
+  <polyline points="256,430 105,175"
+            fill="none" stroke="url(#grad)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Left arrowhead -->
+  <polygon points="105,175 70,140 90,210 130,195" fill="#00BFA6"/>
+
+  <!-- Right arm: thick stroke rising from bottom-center to upper-right with arrowhead -->
+  <polyline points="256,430 407,175"
+            fill="none" stroke="url(#grad)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right arrowhead -->
+  <polygon points="407,175 442,140 422,210 382,195" fill="#2962FF"/>
+
+  <!-- Gauge arc connecting the two arms -->
+  <path d="M 155 235 A 130 130 0 0 1 357 235"
+        fill="none" stroke="url(#grad)" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Tick marks on the gauge arc (5 bold ticks) -->
+  <line x1="190" y1="195" x2="200" y2="222" stroke="url(#grad)" stroke-width="12" stroke-linecap="round"/>
+  <line x1="230" y1="178" x2="235" y2="206" stroke="url(#grad)" stroke-width="12" stroke-linecap="round"/>
+  <line x1="256" y1="172" x2="256" y2="200" stroke="url(#grad)" stroke-width="12" stroke-linecap="round"/>
+  <line x1="282" y1="178" x2="277" y2="206" stroke="url(#grad)" stroke-width="12" stroke-linecap="round"/>
+  <line x1="322" y1="195" x2="312" y2="222" stroke="url(#grad)" stroke-width="12" stroke-linecap="round"/>
+</svg>

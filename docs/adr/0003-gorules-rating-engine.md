@@ -56,6 +56,69 @@ customer contests a charge, the exact rule version that was active at the time o
 rating can be retrieved and re-evaluated against the original event. The MIT license
 permits unrestricted use, modification, and distribution.
 
+## Catalog tier → JDM mapping (non-normative feasibility sketch)
+
+This section is a design sanity check, not a normative specification. It sketches
+how [METR-0003](../../enhancements/0003-product-catalog/product-catalog.md) catalog
+tiers (§3.5 tiers table, `charge_model: tiered`) could map to a GoRules JDM
+evaluated by the rating transform block in
+[METR-0002](../../enhancements/0002-extensibility/extensibility.md). Volume and
+staircase charge models are deferred to a dedicated rating spike; only graduated
+(tiered) pricing is explored here.
+
+```mermaid
+flowchart TD
+  A[Catalog price book tiers] --> B[Compile or hydrate JDM snapshot]
+  C[Metered event + cumulative_usage] --> D[JDM inputs]
+  B --> E[ZEN engine evaluate]
+  D --> E
+  E --> F[unit_price, flat_fee, rated_amount]
+  F --> G[Rated event on RecordBatch]
+```
+
+At rating time, the worker loads the immutable JDM snapshot for the active price
+book version, then for each event supplies JDM inputs derived from catalog tier
+rows (`lower_bound`, `upper_bound`, `charge_model`) plus runtime context
+(`cumulative_usage`, `quantity`, `product_id`, billing period). Decision tables
+or expression nodes emit `unit_price`, optional `flat_fee`, and `rated_amount`.
+
+```text
+# Pseudocode — graduated (tiered) charge_model only
+tiers := catalog.price_book.tiers where charge_model == "tiered"  # METR-0003 §3.5
+usage := event.cumulative_usage  # or quantity for non-cumulative meters
+
+rated := 0
+remaining := usage
+for tier in tiers sorted by lower_bound:
+    tier_units := min(remaining, tier.upper_bound - tier.lower_bound)  # open-ended if upper_bound null
+    rated += tier_units * tier.unit_price + tier.flat_fee
+    remaining -= tier_units
+    if remaining <= 0: break
+
+output := { unit_price: effective_blended_rate, flat_fee: 0, rated_amount: rated }
+```
+
+**Worked example — CPU core-hours, `charge_model: tiered` (graduated):**
+
+| Tier | Range (core-hours) | Unit price |
+|------|-------------------|------------|
+| 1 | 0 – 100 | $0.10 |
+| 2 | 100 – 1,000 | $0.08 |
+| 3 | 1,000+ | $0.05 |
+
+For **1,500** core-hours: 100 × $0.10 + 900 × $0.08 + 500 × $0.05 = **$107.00**
+(`rated_amount`). In JDM this is typically a function graph: tier rows supply
+bounds and prices; an expression node computes partial quantities per band and
+sums to `rated_amount`.
+
+**Scope limit:** This sketch does not define JDM templates, catalog-to-JDM
+compilation, or volume/staircase models. Those belong to implementation work
+and a follow-on rating spike.
+
+**Open question:** A GoRules integration spike (catalog tier hydration, decimal
+precision, cumulative usage windows, JDM authoring UX) is required before v1 can
+commit to this rating engine choice with confidence.
+
 ## Consequences
 
 ### Positive
@@ -188,6 +251,8 @@ decision table evaluation pattern that billing requires.
 
 ## References
 
+- [METR-0002: Platform Extensibility](../../enhancements/0002-extensibility/extensibility.md) — rating transform block (`meteridian/tiered-rater`)
+- [METR-0003: Product and Service Catalog](../../enhancements/0003-product-catalog/product-catalog.md) — price book tiers (§3.5), `charge_model`
 - [GoRules](https://gorules.io/)
 - [GoRules ZEN Engine GitHub](https://github.com/gorules/zen)
 - [JDM Editor](https://github.com/gorules/jdm-editor)

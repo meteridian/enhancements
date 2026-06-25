@@ -669,6 +669,108 @@ jurisdiction, known rates) to enable air-gapped deployments and reduce
 dependency on external services for simple scenarios. It is not a substitute
 for Avalara or Vertex in complex multi-jurisdiction environments.
 
+### 15.1 Built-in Tax Engine (`tax-calc-internal`)
+
+For sovereign cloud operators, air-gapped deployments, and environments where
+external API calls are unacceptable, Meteridian provides a native tax
+calculation engine. This moves Tax Calculation from pure delegation to
+**partial native coverage**.
+
+#### Scope and Coverage
+
+| Tax Regime | Supported | Implementation |
+|-----------|-----------|---------------|
+| EU VAT (standard, reduced, zero) | ✅ | Rate table per Member State, updated quarterly |
+| EU VAT reverse-charge (B2B cross-border) | ✅ | GoRules decision table: buyer.country ≠ seller.country ∧ buyer.vat_registered → reverse-charge |
+| EU VAT digital services (MOSS/OSS) | ✅ | Place-of-supply rules for B2C digital services |
+| UK VAT | ✅ | Standard (20%), reduced (5%), zero-rated categories |
+| GST single-rate (AU, NZ, SG, CA) | ✅ | Fixed rate per jurisdiction |
+| GST multi-slab (India) | ✅ | Product category → slab mapping (0%, 5%, 12%, 18%, 28%) |
+| Brazil IBS/CBS (from 2026) | ⚠️ | Basic dual-rate; complex ICMS/ISS split requires external |
+| Saudi Arabia VAT | ✅ | 15% standard, zero for exports, exempt for financial services |
+| US sales tax (multi-state nexus) | ❌ | Delegate to Avalara/Vertex — nexus rules too complex |
+| Canadian GST/HST/PST | ⚠️ | Federal GST + provincial rates; some PST edge cases need external |
+| Withholding tax | ❌ | Delegate — varies wildly by treaty and entity type |
+
+#### Data Model
+
+```go
+type TaxRule struct {
+    ID              uuid.UUID       `json:"id"`
+    Jurisdiction    string          `json:"jurisdiction"`
+    TaxType         string          `json:"tax_type"`
+    Rate            decimal.Decimal `json:"rate"`
+    Category        string          `json:"category"`
+    EffectiveFrom   time.Time       `json:"effective_from"`
+    EffectiveTo     *time.Time      `json:"effective_to,omitempty"`
+    Conditions      []TaxCondition  `json:"conditions,omitempty"`
+}
+
+type TaxCondition struct {
+    Field    string `json:"field"`
+    Operator string `json:"operator"`
+    Value    string `json:"value"`
+}
+
+type TaxResult struct {
+    Jurisdiction string          `json:"jurisdiction"`
+    TaxType      string          `json:"tax_type"`
+    Rate         decimal.Decimal `json:"rate"`
+    TaxableAmount decimal.Decimal `json:"taxable_amount"`
+    TaxAmount    decimal.Decimal `json:"tax_amount"`
+    Exempt       bool            `json:"exempt"`
+    ExemptReason string          `json:"exempt_reason,omitempty"`
+    ReverseCharge bool           `json:"reverse_charge"`
+}
+```
+
+#### Decision Table (GoRules)
+
+Tax determination uses a GoRules JDM decision table for rule evaluation:
+
+```
+┌─────────────────┬──────────────┬──────────────┬───────────────┬────────┐
+│ seller.country  │ buyer.country│ buyer.type   │ product.cat   │ Result │
+├─────────────────┼──────────────┼──────────────┼───────────────┼────────┤
+│ DE              │ DE           │ *            │ digital       │ 19%    │
+│ DE              │ FR           │ B2B + VAT ID │ *             │ RC 0%  │
+│ DE              │ FR           │ B2C          │ digital       │ FR 20% │
+│ IN              │ IN           │ *            │ saas          │ 18%    │
+│ SA              │ SA           │ *            │ *             │ 15%    │
+│ SA              │ *            │ *            │ export        │ 0%     │
+│ *               │ US:*         │ *            │ *             │ DEFER  │
+└─────────────────┴──────────────┴──────────────┴───────────────┴────────┘
+```
+
+`DEFER` = fall through to external tax engine (Avalara/Vertex). This enables
+a **hybrid approach**: handle simple VAT/GST natively, delegate complex US
+nexus to specialists.
+
+#### Rate Updates
+
+- **EU VAT rates:** Published by European Commission; updated quarterly via
+  an automated fetch job (or manual upload for air-gapped)
+- **GST rates:** Relatively stable; updated via configuration
+- **Operator override:** Operators can add/modify rates via Admin API or
+  YAML configuration (GitOps-compatible)
+
+```
+POST   /api/v1/tax/rules                        # Create/update tax rule
+GET    /api/v1/tax/rules?jurisdiction=DE         # List rules for jurisdiction
+POST   /api/v1/tax/calculate                    # Calculate tax for a transaction
+GET    /api/v1/tax/rates/{jurisdiction}          # Current effective rates
+```
+
+#### When to Use Built-in vs. External
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Sovereign cloud (EU/ME) selling to known jurisdictions | **Built-in** — no external dependency |
+| Air-gapped / classified deployment | **Built-in** — external APIs unreachable |
+| US-based SaaS with multi-state nexus | **External** (Avalara) — nexus too complex |
+| Global enterprise with 50+ jurisdictions | **Hybrid** — built-in for EU/GST, external for US/exotic |
+| MVP / development / testing | **Built-in** — zero external config needed |
+
 ---
 
 ## 16. Archival and Long-Term Storage

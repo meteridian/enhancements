@@ -34,64 +34,64 @@ on-premises-first, and covering infrastructure metering that no competitor can.
 ## Revenue Lifecycle Pipeline
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph L1["Layer 1: Catalog & Pricing"]
-        direction TB
+        direction LR
         M1["Product Catalog"]
         M2["Pricing / Rate Cards"]
         M3["Pricing Simulation"]
     end
 
     subgraph L2["Layer 2: Quote & Contract"]
-        direction TB
+        direction LR
         M4["Quoting / CPQ"]
         M5["Contract Management"]
         M6["Order Management"]
     end
 
     subgraph L3["Layer 3: Metering & Mediation"]
-        direction TB
-        M7["Metering / Data Collection"]
+        direction LR
+        M7["Metering"]
         M8["Mediation"]
-        M9["Infrastructure Collectors"]
-        M10["AI/ML Metering"]
-        M11["Multi-Cloud Metering"]
+        M9["Infra Collectors"]
+        M10["AI/ML"]
+        M11["Multi-Cloud"]
     end
 
     subgraph L4["Layer 4: Rating & Charging"]
-        direction TB
-        M12["Rating / Charging Engine"]
-        M13["Discounts / Promotions"]
-        M14["Wallet / Credits / Prepaid"]
-        M15["Entitlements / Access"]
+        direction LR
+        M12["Rating Engine"]
+        M13["Discounts"]
+        M14["Wallet/Credits"]
+        M15["Entitlements"]
         M16["Budget Enforcement"]
     end
 
     subgraph L5["Layer 5: Billing & Invoicing"]
-        direction TB
-        M17["Billing / Charge Calc"]
-        M18["Invoice Generation"]
-        M19["E-Invoicing / Compliance"]
-        M20["Tax Calculation"]
-        M21["Credit Notes / Adjustments"]
+        direction LR
+        M17["Charge Calc"]
+        M18["Invoice Gen"]
+        M19["E-Invoicing"]
+        M20["Tax Calc"]
+        M21["Credit Notes"]
     end
 
     subgraph L6["Layer 6: Collection & Settlement"]
-        direction TB
-        M22["Payment Collection"]
+        direction LR
+        M22["Payment/Dunning"]
         M23["Partner Settlement"]
         M24["Revenue Recognition"]
     end
 
     subgraph L7["Layer 7: Governance & Intelligence"]
-        direction TB
-        M25["Revenue Assurance"]
-        M26["Analytics / BI"]
+        direction LR
+        M25["Rev Assurance"]
+        M26["Analytics"]
         M27["Unit Economics"]
-        M28["Forecasting & Anomaly"]
-        M29["Cost Allocation"]
-        M30["Customer Portal"]
-        M31["Legal / Compliance"]
+        M28["Forecasting"]
+        M29["Cost Alloc"]
+        M30["Portal"]
+        M31["Legal"]
     end
 
     L1 --> L2 --> L3 --> L4 --> L5 --> L6

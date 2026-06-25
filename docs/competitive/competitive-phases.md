@@ -130,31 +130,9 @@ graph LR
 
 ## Detailed Phase Coverage Matrix (Transposed)
 
-Tools as rows, all 31 modules as columns — ordered left-to-right from infrastructure-adjacent to governance.
+Tools as rows, all 31 modules as columns — grouped by layer in pipeline order (1→7).
 
 **Legend:** ✅ Full | ⚠️ Partial | 🔵 Planned | ➡️ Delegates | ❌ None
-
-### Layer 3: Metering & Mediation
-
-| Tool | Metering | Mediation | Infra Collectors | AI/ML Metering | Multi-Cloud |
-|------|:--------:|:---------:|:----------------:|:--------------:|:-----------:|
-| **Meteridian** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Monetize360** | ✅ | ✅ | ❌ | ✅ | ⚠️ |
-| **RH Cost Mgmt** | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
-| **OpenMeter** | ✅ | ⚠️ | ❌ | ⚠️ | ❌ |
-| **Lago** | ✅ | ⚠️ | ❌ | ❌ | ❌ |
-| **Metronome** | ✅ | ⚠️ | ❌ | ⚠️ | ❌ |
-
-### Layer 4: Rating & Charging
-
-| Tool | Rating Engine | Discounts | Wallet/Credits | Entitlements | Budget Enforcement |
-|------|:------------:|:---------:|:--------------:|:------------:|:------------------:|
-| **Meteridian** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Monetize360** | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| **OpenMeter** | ⚠️ | ⚠️ | ✅ | ✅ | ❌ |
-| **Lago** | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
-| **Metronome** | ✅ | ⚠️ | ✅ | ⚠️ | ❌ |
-| **RH Cost Mgmt** | ⚠️ | ⚠️ | ❌ | ❌ | ❌ |
 
 ### Layer 1: Catalog & Pricing
 
@@ -177,6 +155,28 @@ Tools as rows, all 31 modules as columns — ordered left-to-right from infrastr
 | **OpenMeter** | ❌ | ❌ | ❌ |
 | **Lago** | ❌ | ❌ | ❌ |
 | **RH Cost Mgmt** | ❌ | ❌ | ❌ |
+
+### Layer 3: Metering & Mediation
+
+| Tool | Metering | Mediation | Infra Collectors | AI/ML Metering | Multi-Cloud |
+|------|:--------:|:---------:|:----------------:|:--------------:|:-----------:|
+| **Meteridian** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Monetize360** | ✅ | ✅ | ❌ | ✅ | ⚠️ |
+| **RH Cost Mgmt** | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| **OpenMeter** | ✅ | ⚠️ | ❌ | ⚠️ | ❌ |
+| **Lago** | ✅ | ⚠️ | ❌ | ❌ | ❌ |
+| **Metronome** | ✅ | ⚠️ | ❌ | ⚠️ | ❌ |
+
+### Layer 4: Rating & Charging
+
+| Tool | Rating Engine | Discounts | Wallet/Credits | Entitlements | Budget Enforcement |
+|------|:------------:|:---------:|:--------------:|:------------:|:------------------:|
+| **Meteridian** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Monetize360** | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| **OpenMeter** | ⚠️ | ⚠️ | ✅ | ✅ | ❌ |
+| **Lago** | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **Metronome** | ✅ | ⚠️ | ✅ | ⚠️ | ❌ |
+| **RH Cost Mgmt** | ⚠️ | ⚠️ | ❌ | ❌ | ❌ |
 
 ### Layer 5: Billing & Invoicing
 
@@ -213,7 +213,77 @@ Tools as rows, all 31 modules as columns — ordered left-to-right from infrastr
 
 ---
 
-## Detailed Module Comparison
+## Module Definitions
+
+What each phase/module does, explained for humans.
+
+### Layer 1: Catalog & Pricing — *"What do we sell and at what price?"*
+
+| # | Module | What It Does |
+|---|--------|-------------|
+| 1 | **Product Catalog** | The master list of everything you sell: products, plans, add-ons, SKUs, bundles. Think of it as your digital menu — if it's not in the catalog, you can't bill for it. |
+| 2 | **Pricing / Rate Cards** | Defines *how much* things cost. Supports different models: flat fee, per-unit, tiered (first 100 GB at $0.05, next 900 at $0.03), volume discounts, time-of-day rates, committed spend. |
+| 3 | **Pricing Simulation** | "What if we change our pricing?" — run hypothetical rate plans against real historical usage to predict revenue impact *before* changing anything in production. |
+
+### Layer 2: Quote & Contract — *"How do we formalize a deal?"*
+
+| # | Module | What It Does |
+|---|--------|-------------|
+| 4 | **Quoting / CPQ** | Generate proposals and quotes for customers. Configure-Price-Quote: pick products, apply discounts, produce a PDF/document the customer can sign. |
+| 5 | **Contract Management** | Handle multi-year agreements: committed spend, ramp deals (increasing over time), amendments, renewal terms, early termination clauses. The legal backbone of recurring revenue. |
+| 6 | **Order Management** | Once a quote is signed, an *order* triggers provisioning: spin up resources, activate accounts, start metering. Bridges "we agreed to sell X" and "X is now running." |
+
+### Layer 3: Metering & Mediation — *"How do we measure what customers use?"*
+
+| # | Module | What It Does |
+|---|--------|-------------|
+| 7 | **Metering / Data Collection** | Ingest raw usage events at scale — API calls, compute-hours, data transferred, logins, anything. The firehose of "what happened." |
+| 8 | **Mediation** | Clean up the raw events: normalize formats, deduplicate, validate, enrich with metadata. Turns messy telemetry into reliable billing data. |
+| 9 | **Infrastructure Collectors** | Agents/exporters that gather metrics directly from bare metal (IPMI/Redfish), VMs (libvirt), containers (K8s), network gear (SNMP/NetFlow), OpenStack, mainframes. |
+| 10 | **AI/ML Metering** | Specialized metering for AI workloads: LLM tokens (input/output/cached), GPU-hours, MIG slices, training job duration, inference latency, agent tool-call chains. |
+| 11 | **Multi-Cloud Metering** | Ingest billing data from cloud providers: AWS Cost & Usage Reports, Azure exports, GCP BigQuery billing, FOCUS standard format, SaaS vendor APIs. |
+
+### Layer 4: Rating & Charging — *"How do we turn usage into money?"*
+
+| # | Module | What It Does |
+|---|--------|-------------|
+| 12 | **Rating / Charging Engine** | Apply rate cards to metered usage. The math engine: "1,247 CPU-hours × tier-2 rate × time-of-day multiplier = $X." Telco-grade means sub-second, millions of events. |
+| 13 | **Discounts / Promotions** | Apply coupons, volume discounts, promotional pricing, loyalty rewards. Layer on top of base rating to produce the *net* amount the customer actually pays. |
+| 14 | **Wallet / Credits / Prepaid** | Customers pre-pay into a wallet (credits, tokens, prepaid balance). Usage draws down from the wallet. Supports pooling, rollover, expiry, and shared wallets across teams. |
+| 15 | **Entitlements / Access Control** | Enforce what customers are *allowed* to use based on their plan: feature flags, usage limits, API rate limits. "You're on the Free tier — max 1,000 API calls/day." |
+| 16 | **Budget Enforcement** | Hard spending caps and throttling. When a budget limit is hit: patch K8s quotas, return 429s from the API gateway, shut down VMs, or notify before action. |
+
+### Layer 5: Billing & Invoicing — *"How do we present the bill?"*
+
+| # | Module | What It Does |
+|---|--------|-------------|
+| 17 | **Billing / Charge Calculation** | Aggregate all rated charges for a billing period into a final amount due. Handles proration, mid-cycle upgrades, partial months, and billing schedule alignment. |
+| 18 | **Invoice Generation** | Produce the actual invoice document: line items, subtotals, tax, PDF rendering, email delivery. What the customer's accounts-payable team receives. |
+| 19 | **E-Invoicing / Compliance** | Structured electronic invoicing mandated by governments: EN 16931 (EU), Factur-X (FR), CFDI (Mexico), Peppol delivery, digital signatures, tax authority real-time clearance. |
+| 20 | **Tax Calculation** | Determine the correct tax rate and amount for each transaction: VAT, GST, US sales tax (nexus), reverse-charge, exemptions. Either built-in or via Avalara/Vertex. |
+| 21 | **Credit Notes / Adjustments** | Issue corrections after the fact: credit memos for overcharges, refunds, billing disputes, SLA credit payouts. The "undo" button for billing. |
+
+### Layer 6: Collection & Settlement — *"How do we get paid and share revenue?"*
+
+| # | Module | What It Does |
+|---|--------|-------------|
+| 22 | **Payment Collection / Dunning** | Charge the customer's payment method, handle failures (retry logic, exponential backoff), escalate (email reminders → phone → suspend service). The "please pay us" workflow. |
+| 23 | **Partner Settlement / Rev-share** | Split revenue with partners, resellers, or marketplace participants. "We keep 70%, partner gets 30%." Calculate, reconcile, and pay out. |
+| 24 | **Revenue Recognition** | Accounting rules (ASC 606 / IFRS 15): recognize revenue when earned, not when invoiced. Deferred revenue schedules, performance obligations, multi-element allocation. Required for audited financials. |
+
+### Layer 7: Governance & Intelligence — *"What do we learn from all this data?"*
+
+| # | Module | What It Does |
+|---|--------|-------------|
+| 25 | **Revenue Assurance / Leakage** | Reconcile metered usage vs. rated charges vs. invoiced amounts. Detect leakage: "We metered 10,000 API calls but only billed for 9,200 — where did 800 go?" |
+| 26 | **Analytics / BI / Reporting** | Dashboards, usage trend charts, cost breakdowns, executive reports. Answer "how much did customer X spend last month?" and "which product is growing fastest?" |
+| 27 | **Unit Economics** | Cost per transaction, per user, per feature. Margin analysis by product line. "Each API call costs us $0.002 to serve and we charge $0.01 — that's 80% margin." |
+| 28 | **Forecasting & Anomaly Detection** | Predict future costs/revenue (time series forecasting), detect anomalies ("spending jumped 300% overnight — alert!"), budget vs. actual tracking. |
+| 29 | **Cost Allocation / Chargeback** | Attribute shared infrastructure costs to teams, projects, or customers. Internal chargeback: "Platform team's cluster costs $50K/month — Team A owns 40%, Team B owns 60%." |
+| 30 | **Customer Portal / Self-Service** | End-user-facing dashboards where customers see their own usage, invoices, payment history, budget alerts. Reduce support tickets by letting users self-serve. |
+| 31 | **Legal / Regulatory Compliance** | GDPR data residency, right to deletion, audit trails, Gaia-X sovereignty requirements, compliance-as-code (OPA policies), SOC 2 evidence generation. |
+
+---
 
 ### Legend
 

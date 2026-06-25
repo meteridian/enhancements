@@ -18,7 +18,7 @@ intelligence modules that the broader market requires.
 |------|------|---------|---------|-----------|------|-------------------|
 | **Monetize360** | 25 | 4 | 0 | 0 | 2 | 29/31 |
 | **OpenMeter (Kong)** | 7 | 6 | 0 | 2 | 16 | 15/31 |
-| **Meteridian** | 19 | 0 | 7 | 3 | 2 | 29/31 |
+| **Meteridian** | 19 | 0 | 8 | 2 | 2 | 29/31 |
 | **RH Cost Mgmt (Koku)** | 5 | 5 | 0 | 0 | 21 | 10/31 |
 | **Lago** | 7 | 4 | 0 | 2 | 18 | 13/31 |
 | **Metronome (Stripe)** | 6 | 5 | 0 | 2 | 18 | 13/31 |
@@ -126,7 +126,7 @@ block-beta
 | **3. Metering & Mediation** | 3/5 | 2/5 | 5/5 | 3/5 | 2/5 | 2/5 |
 | **4. Rating & Charging** | 4/5 | 3/5 | 5/5 | 1/5 | 3/5 | 3/5 |
 | **5. Billing & Invoicing** | 4/5 | 3/5 | 1/5 (+3†) | 0/5 | 4/5 | 3/5 |
-| **6. Collection & Settlement** | 3/3 | 0/3 | 0/3 (+2†) | 0/3 | 0/3 | 0/3 |
+| **6. Collection & Settlement** | 3/3 | 0/3 | 0/3 (+3†) | 0/3 | 0/3 | 0/3 |
 | **7. Governance & Intelligence** | 5/7 | 1/7 | 7/7 | 4/7 | 1/7 | 1/7 |
 
 † = open PR / planned
@@ -235,12 +235,12 @@ block-beta
 
 | # | Module | Monetize360 | OpenMeter | Meteridian | RH Cost Mgmt | Lago | Metronome |
 |---|--------|:-----------:|:---------:|:----------:|:------------:|:----:|:---------:|
-| 22 | Payment Collection / Dunning | ✅ | ➡️ | ➡️ | ❌ | ➡️ | ➡️ |
+| 22 | Payment Collection / Dunning | ✅ | ➡️ | 🔵 | ❌ | ➡️ | ➡️ |
 | 23 | Partner Settlement / Rev-share | ✅ | ❌ | 🔵 | ❌ | ❌ | ❌ |
 | 24 | Revenue Recognition | ✅ | ❌ | 🔵 | ❌ | ❌ | ❌ |
 
 **Notes:**
-- Payment collection remains delegated by design (Lago/Stripe handle payment rails)
+- Payment rails remain delegated (Lago/Stripe charge cards and retry). However, METR-0009 §17.4 adds a **payment lifecycle FSM** (tracking status end-to-end) and METR-0011 §7.4 adds the **dunning→enforcement bridge** (graduated service degradation on payment failure). This makes Meteridian "planned/partial" rather than pure delegation.
 - METR-0004 (fix-revenue-recognition branch): Full **ASC 606 + IFRS 15** dual-standard support including 5-step model, breakage estimation, multi-element arrangement allocation, and jurisdiction-configurable reporting
 - Partner settlement is planned but no dedicated enhancement yet (referenced in architecture docs)
 

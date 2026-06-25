@@ -18,14 +18,14 @@ intelligence modules that the broader market requires.
 |------|------|---------|---------|-----------|------|-------------------|
 | **Monetize360** | 25 | 4 | 0 | 0 | 2 | 29/31 |
 | **OpenMeter (Kong)** | 7 | 6 | 0 | 2 | 16 | 15/31 |
-| **Meteridian** | 19 | 0 | 10 | 2 | 0 | 31/31 |
+| **Meteridian** | 21 | 0 | 10 | 0 | 0 | 31/31 |
 | **RH Cost Mgmt (Koku)** | 5 | 5 | 0 | 0 | 21 | 10/31 |
 | **Lago** | 7 | 4 | 0 | 2 | 18 | 13/31 |
 | **Metronome (Stripe)** | 6 | 5 | 0 | 2 | 18 | 13/31 |
 
 **Key insight:** Koku covers 10/31 modules (the baseline). Meteridian is designed
 as its successor, expanding from 10 to 31 module involvement (19 full + 10
-planned + 2 delegates). With all open PRs shipped, Meteridian covers every
+planned). With all open PRs shipped, Meteridian covers every
 module in the revenue lifecycle — no gaps remain — while being Apache 2.0,
 on-premises-first, and covering infrastructure metering that no competitor can.
 
@@ -222,7 +222,7 @@ block-beta
 | 17 | Billing / Charge Calculation | ✅ | ✅ | 🔵 | ❌ | ✅ | ✅ |
 | 18 | Invoice Generation | ✅ | ✅ | 🔵 | ❌ | ✅ | ✅ |
 | 19 | E-Invoicing / Compliance | ❌ | ❌ | 🔵 | ❌ | ❌ | ❌ |
-| 20 | Tax Calculation | ✅ | ➡️ | ➡️ | ❌ | ➡️ | ➡️ |
+| 20 | Tax Calculation | ✅ | ➡️ | 🔵 | ❌ | ➡️ | ➡️ |
 | 21 | Credit Notes / Adjustments | ✅ | ⚠️ | 🔵 | ❌ | ✅ | ⚠️ |
 
 **Notes:**

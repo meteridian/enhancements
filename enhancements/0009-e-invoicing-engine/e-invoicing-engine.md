@@ -5,7 +5,7 @@
 - **Created:** 2026-06-19
 - **Last Updated:** 2026-06-19
 - **Depends on:** METR-0001 (Platform Architecture), METR-0002 (Extensibility), METR-0003 (Product Catalog)
-- **Related:** METR-0004 (Credit and Token Billing), METR-0007 (Legal and Regulatory Compliance), METR-0008 (Compliance-as-Code), ADR-0016 (E-Invoice Canonical Model)
+- **Related:** METR-0004 (Credit and Token Billing), METR-0007 (Legal and Regulatory Compliance), METR-0008 (Compliance-as-Code), METR-0011 (Enforcement Integration), ADR-0010 (Pluggable Payment Providers), ADR-0016 (E-Invoice Canonical Model)
 
 ---
 
@@ -729,6 +729,136 @@ GET    /api/v1/exchange-rates/{from}/{to}/history # Historical rates
 POST   /api/v1/exchange-rates/sources           # Configure rate sources
 ```
 
+### 17.4 Invoice Payment Lifecycle
+
+While Meteridian delegates payment collection to external PSPs (Stripe, Lago,
+GoCardless — see ADR-0010), it must track the **payment status** of each
+invoice to close the billing loop and trigger enforcement actions
+(METR-0011 §7.4) when payments fail.
+
+#### Payment Status FSM
+
+```
+                    generate
+                       │
+                       ▼
+                  ┌─────────┐
+                  │  UNPAID  │
+                  └────┬────┘
+                       │ PSP initiates charge
+                       ▼
+                  ┌──────────┐
+             ┌────│PROCESSING│────┐
+             │    └──────────┘    │
+             │ success            │ failure
+             ▼                    ▼
+        ┌────────┐          ┌────────┐
+        │  PAID  │          │ FAILED │
+        └────────┘          └───┬────┘
+                                │ retry (PSP-owned)
+                                ▼
+                           ┌─────────┐
+                      ┌────│RETRYING │────┐
+                      │    └─────────┘    │
+                      │ success           │ max retries
+                      ▼                   ▼
+                 ┌────────┐          ┌─────────┐
+                 │  PAID  │          │ OVERDUE │
+                 └────────┘          └────┬────┘
+                                          │ grace period expires
+                                          ▼
+                                    ┌────────────┐
+                                    │WRITTEN_OFF │
+                                    └────────────┘
+```
+
+| Status | Description | Enforcement Impact |
+|--------|-------------|-------------------|
+| `unpaid` | Invoice generated, not yet due or charge not initiated | None |
+| `processing` | PSP is attempting to collect | None |
+| `paid` | Payment succeeded | Restore (if previously degraded) |
+| `failed` | First payment attempt failed | Notify (METR-0011 §7.4) |
+| `retrying` | PSP is retrying (dunning in progress) | Throttle after N retries |
+| `overdue` | All retries exhausted, past grace period | Block service |
+| `written_off` | Debt written off as uncollectable | Terminate service |
+| `partially_paid` | Partial payment received | Pro-rata enforcement relaxation |
+| `refunded` | Full refund issued | Credit applied to balance |
+| `disputed` | Customer dispute/chargeback in progress | No enforcement change (pending resolution) |
+
+#### Invoice Model Extension
+
+The `CanonicalInvoice` struct gains payment lifecycle fields:
+
+```go
+type PaymentLifecycle struct {
+    Status          PaymentStatus `json:"status"`
+    PSPReference    string        `json:"psp_reference,omitempty"`
+    PaymentMethod   string        `json:"payment_method,omitempty"`
+    AmountPaid      Money         `json:"amount_paid"`
+    AmountDue       Money         `json:"amount_due"`
+    DueDate         time.Time     `json:"due_date"`
+    PaidAt          *time.Time    `json:"paid_at,omitempty"`
+    DunningStep     int           `json:"dunning_step"`
+    LastAttemptAt   *time.Time    `json:"last_attempt_at,omitempty"`
+    NextRetryAt     *time.Time    `json:"next_retry_at,omitempty"`
+    GracePeriodEnds *time.Time    `json:"grace_period_ends,omitempty"`
+    WrittenOffAt    *time.Time    `json:"written_off_at,omitempty"`
+}
+
+type PaymentStatus string
+
+const (
+    PaymentUnpaid       PaymentStatus = "unpaid"
+    PaymentProcessing   PaymentStatus = "processing"
+    PaymentPaid         PaymentStatus = "paid"
+    PaymentFailed       PaymentStatus = "failed"
+    PaymentRetrying     PaymentStatus = "retrying"
+    PaymentOverdue      PaymentStatus = "overdue"
+    PaymentWrittenOff   PaymentStatus = "written_off"
+    PaymentPartiallyPaid PaymentStatus = "partially_paid"
+    PaymentRefunded     PaymentStatus = "refunded"
+    PaymentDisputed     PaymentStatus = "disputed"
+)
+```
+
+#### PSP Webhook Ingestion
+
+Meteridian exposes a webhook receiver that PSPs call to report payment status
+changes. The receiver is idempotent and maps PSP-specific events to the
+internal payment status FSM:
+
+```
+POST   /api/v1/webhooks/payments/{provider}     # Receive PSP webhook
+```
+
+| PSP Event (Stripe example) | Maps To | Side Effect |
+|----------------------------|---------|-------------|
+| `payment_intent.succeeded` | `paid` | Emit `billing.enforcement.action` with `action: restore` |
+| `payment_intent.payment_failed` | `failed` / `retrying` | Emit enforcement signal per dunning policy |
+| `invoice.overdue` | `overdue` | Emit enforcement `block` signal |
+| `charge.dispute.created` | `disputed` | Pause enforcement; flag for review |
+| `charge.refunded` | `refunded` | Apply credit to tenant balance |
+
+**Webhook verification:** Each PSP adapter verifies webhook signatures
+(Stripe: `Stripe-Signature` header with HMAC-SHA256; Lago: webhook secret;
+GoCardless: webhook key). Unverified webhooks are rejected with 401.
+
+**Idempotency:** Each webhook carries a PSP-assigned event ID. Meteridian
+deduplicates by storing processed event IDs (TTL: 72h) in Valkey.
+
+**Reconciliation job:** A periodic job (default: every 6h) queries the PSP
+API for invoices in `processing` or `retrying` state that have not received
+a webhook update within the expected timeframe. This handles missed webhooks
+and ensures enforcement is eventually consistent.
+
+#### Integration with Enforcement (METR-0011)
+
+When the payment status FSM transitions to a state that requires enforcement,
+Meteridian emits the same `billing.enforcement.action` CloudEvent defined in
+METR-0011 §7.4, with `reason: "payment_failed"`. The enforcement pipeline
+treats payment-triggered signals identically to balance-threshold signals —
+same Limitador push path, same K8s quota patching, same graduated escalation.
+
 ---
 
 ## 18. Roadmap and Phasing
@@ -838,6 +968,8 @@ POST   /api/v1/exchange-rates/sources           # Configure rate sources
   audit trail and sequential numbering infrastructure shared with e-invoicing
 - [ADR-0010: Pluggable Payment Providers](../../docs/adr/0010-pluggable-payment-providers.md) —
   payment collection is separate from invoice generation
+- [METR-0011: Closed-Loop Enforcement Integration](../0011-enforcement-integration/enforcement-integration.md) —
+  payment failure triggers enforcement actions (§7.4 dunning→enforcement bridge)
 - [ADR-0016: E-Invoice Canonical Model and Format Selection](../../docs/adr/0016-einvoice-canonical-model.md) —
   decision to use EN 16931 as canonical model
 

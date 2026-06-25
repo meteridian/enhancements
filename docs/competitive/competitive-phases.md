@@ -24,7 +24,7 @@ intelligence modules that the broader market requires.
 | **Metronome (Stripe)** | 6 | 5 | 0 | 2 | 18 | 13/31 |
 
 **Key insight:** Koku covers 10/31 modules (the baseline). Meteridian is designed
-as its successor, expanding from 10 to 31 module involvement (19 full + 10
+as its successor, expanding from 10 to 31 module involvement (21 full + 10
 planned). With all open PRs shipped, Meteridian covers every
 module in the revenue lifecycle — no gaps remain — while being Apache 2.0,
 on-premises-first, and covering infrastructure metering that no competitor can.
@@ -125,7 +125,7 @@ block-beta
 | **2. Quote & Contract** | 3/3 | 0/3 | 1/3 (+2†) | 0/3 | 0/3 | 1/3 |
 | **3. Metering & Mediation** | 3/5 | 2/5 | 5/5 | 3/5 | 2/5 | 2/5 |
 | **4. Rating & Charging** | 4/5 | 3/5 | 5/5 | 1/5 | 3/5 | 3/5 |
-| **5. Billing & Invoicing** | 4/5 | 3/5 | 1/5 (+3†) | 0/5 | 4/5 | 3/5 |
+| **5. Billing & Invoicing** | 4/5 | 3/5 | 0/5 (+5†) | 0/5 | 4/5 | 3/5 |
 | **6. Collection & Settlement** | 3/3 | 0/3 | 0/3 (+3†) | 0/3 | 0/3 | 0/3 |
 | **7. Governance & Intelligence** | 5/7 | 1/7 | 7/7 | 4/7 | 1/7 | 1/7 |
 
@@ -303,13 +303,17 @@ quadrantChart
 | `add-metr-0006` | METR-0006: Developer Experience | draft | SDK, CLI, OpenAPI, local dev playground |
 | `add-metr-0007` | METR-0007: Legal/Regulatory Compliance | draft | GDPR, data residency, Gaia-X, 30+ jurisdictions |
 | `add-metr-0008` | METR-0008: Compliance-as-Code | draft | OPA policies, audit automation, SOC 2 controls |
-| `add-metr-0009` | METR-0009: Native E-Invoicing Engine | draft | Invoice generation, EN 16931, UBL/Factur-X/CFDI, digital signatures, tax authority clearance |
+| `add-metr-0009` | METR-0009: Native E-Invoicing Engine | draft | Invoice generation, EN 16931, UBL/Factur-X/CFDI, digital signatures, tax authority clearance, **§15.1 Built-in Tax Engine**, §17.4 Payment Lifecycle |
 | `add-metr-0010` | METR-0010: AI/ML Metering | draft | Tokens, GPU-hours, MIG slices, training jobs, agent BOM |
 | `add-metr-0011-enforcement` | METR-0011: Enforcement Integration | draft | K8s quotas, Envoy ext_authz, VM lifecycle, Limitador |
 | `add-metr-0012-multi-cloud-metering` | METR-0012: Multi-Cloud Metering | draft | AWS/Azure/GCP/FOCUS ingestion, SaaS providers |
 | `add-unit-economics-and-custom-dimensions` | METR-0013: Unit Economics | draft | Cost per transaction/user/feature, custom dimensions |
 | `add-extensibility` | METR-0002: Extensibility | draft | Pluggable block architecture for all pipeline stages |
 | `add-metr-0015-order-management` | METR-0015: Order Management | draft | Order lifecycle FSM, provisioning signaling, metering activation |
+| `add-metr-0016` | METR-0016: Revenue Recognition Pipeline | draft | ASC 606 / IFRS 15, SSP allocation, deferred revenue waterfall, dual-standard journal entries, ERP export |
+| `add-metr-0017-carbon-sustainability` | METR-0017: Carbon & Sustainability Metering | draft | Energy attribution, embodied carbon, Scope 2/3 allocation, carbon-aware pricing, CSRD/SEC reporting |
+| `add-metr-0018-composable-pricing` | METR-0018: Composable Pricing Algebra | draft | Formal type system, algebraic composition laws, PEL language, correctness proofs, Go/TS SDKs |
+| `deepen-existing-metrs` | Moat deepening: 6 existing METRs | draft | Pre-auth wallet (0004), HW-aware metering (0010), probabilistic sim (0003), enterprise discounts (0012), graph allocation (0005), recovery paths (0011) |
 
 ---
 

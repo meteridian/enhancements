@@ -18,16 +18,16 @@ intelligence modules that the broader market requires.
 |------|------|---------|---------|-----------|------|-------------------|
 | **Monetize360** | 25 | 4 | 0 | 0 | 2 | 29/31 |
 | **OpenMeter (Kong)** | 7 | 6 | 0 | 2 | 16 | 15/31 |
-| **Meteridian** | 19 | 0 | 8 | 2 | 2 | 29/31 |
+| **Meteridian** | 19 | 0 | 10 | 2 | 0 | 31/31 |
 | **RH Cost Mgmt (Koku)** | 5 | 5 | 0 | 0 | 21 | 10/31 |
 | **Lago** | 7 | 4 | 0 | 2 | 18 | 13/31 |
 | **Metronome (Stripe)** | 6 | 5 | 0 | 2 | 18 | 13/31 |
 
 **Key insight:** Koku covers 10/31 modules (the baseline). Meteridian is designed
-as its successor, expanding from 10 to 29 module involvement. With open PRs
-shipped, Meteridian matches Monetize360 on total lifecycle coverage while being
-Apache 2.0, on-premises-first, and covering infrastructure metering that
-Monetize360 cannot.
+as its successor, expanding from 10 to 31 module involvement (19 full + 10
+planned + 2 delegates). With all open PRs shipped, Meteridian covers every
+module in the revenue lifecycle — no gaps remain — while being Apache 2.0,
+on-premises-first, and covering infrastructure metering that no competitor can.
 
 ---
 
@@ -122,7 +122,7 @@ block-beta
 | Layer | Monetize360 | OpenMeter | Meteridian | RH Cost Mgmt | Lago | Metronome |
 |-------|:-----------:|:---------:|:----------:|:------------:|:----:|:---------:|
 | **1. Catalog & Pricing** | 3/3 | 2/3 | 3/3 | 0/3 | 2/3 | 1/3 |
-| **2. Quote & Contract** | 3/3 | 0/3 | 1/3 | 0/3 | 0/3 | 1/3 |
+| **2. Quote & Contract** | 3/3 | 0/3 | 1/3 (+2†) | 0/3 | 0/3 | 1/3 |
 | **3. Metering & Mediation** | 3/5 | 2/5 | 5/5 | 3/5 | 2/5 | 2/5 |
 | **4. Rating & Charging** | 4/5 | 3/5 | 5/5 | 1/5 | 3/5 | 3/5 |
 | **5. Billing & Invoicing** | 4/5 | 3/5 | 1/5 (+3†) | 0/5 | 4/5 | 3/5 |
@@ -166,14 +166,15 @@ block-beta
 
 | # | Module | Monetize360 | OpenMeter | Meteridian | RH Cost Mgmt | Lago | Metronome |
 |---|--------|:-----------:|:---------:|:----------:|:------------:|:----:|:---------:|
-| 4 | Quoting / CPQ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 4 | Quoting / CPQ | ✅ | ❌ | 🔵 | ❌ | ❌ | ❌ |
 | 5 | Contract Management | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ |
-| 6 | Order Management | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 6 | Order Management | ✅ | ❌ | 🔵 | ❌ | ❌ | ❌ |
 
 **Notes:**
-- Quoting/CPQ and Order Management are Monetize360's exclusive territory
-- These are "deal desk" functions typically handled by Salesforce CPQ or DealHub
-- Meteridian's contract management includes multi-year, committed spend, ramp deals, true-up, amendment workflows (Fluxo)
+- METR-0004 §4.0 (Quote Generation): lightweight quoting from Product Catalog + Pricing Simulation, with lifecycle FSM (draft → sent → accepted), Fluxo approval workflows, and automatic quote-to-contract conversion
+- METR-0015 (Order Management): order lifecycle FSM (pending → provisioning → active → suspended → terminated), provisioning webhook/CloudEvent integration, metering activation, enforcement bridge
+- Meteridian's quoting is deliberately minimal: no CPQ configurator, no guided selling. For complex deal desk workflows, integrate with Salesforce CPQ / DealHub via API.
+- Order Management does NOT provision — it signals. K8s operators, Terraform, or Crossplane consume the provisioning events.
 
 ---
 
@@ -295,7 +296,7 @@ quadrantChart
 | PR Branch | Enhancement | Status | Modules Added/Strengthened |
 |-----------|-------------|--------|----------------------------|
 | `add-metr-0003` | METR-0003: Product Catalog | draft | Product Catalog (hierarchical, versioned, effective-dated) |
-| `add-metr-0004` | METR-0004: Credit and Token Billing | draft | Wallet/Credits, Tokenomics, Pooling, DePIN |
+| `add-metr-0004` | METR-0004: Credit and Token Billing | draft | Wallet/Credits, Tokenomics, Pooling, DePIN, **§4.0 Quote Generation** |
 | `fix-revenue-recognition-global-standards` | METR-0004 addendum: Revenue Recognition | draft | ASC 606 + IFRS 15, breakage, multi-element |
 | `add-degradation-policy` | METR-0004 addendum: Degradation Policies | draft | Graceful degradation on credit exhaustion |
 | `add-metr-0005` | METR-0005: Internal Token Economy | draft | Gamified chargeback, department token budgets |
@@ -308,6 +309,7 @@ quadrantChart
 | `add-metr-0012-multi-cloud-metering` | METR-0012: Multi-Cloud Metering | draft | AWS/Azure/GCP/FOCUS ingestion, SaaS providers |
 | `add-unit-economics-and-custom-dimensions` | METR-0013: Unit Economics | draft | Cost per transaction/user/feature, custom dimensions |
 | `add-extensibility` | METR-0002: Extensibility | draft | Pluggable block architecture for all pipeline stages |
+| `add-metr-0015-order-management` | METR-0015: Order Management | draft | Order lifecycle FSM, provisioning signaling, metering activation |
 
 ---
 
@@ -377,10 +379,10 @@ flowchart LR
 
 ## Modules Where Each Tool Leads
 
-### Monetize360 Exclusive (no competitor covers)
+### Monetize360 Exclusive (no competitor covers natively today)
 
-1. **Quoting / CPQ** — Generate proposals, deal desk automation
-2. **Order Management** — Process orders, trigger provisioning
+1. **Quoting / CPQ** — Full guided selling and deal desk (Meteridian has lightweight quoting planned, but not CPQ-grade)
+2. **Order Management** — Native orchestrated provisioning (Meteridian has order signaling planned, but delegates provisioning)
 
 ### Meteridian Exclusive (no competitor covers)
 

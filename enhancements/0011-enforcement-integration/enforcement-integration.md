@@ -512,6 +512,101 @@ Beyond binary allow and block, enforcement supports graduated responses:
 | `burst_penalty` | Apply 2x multiplied rate limit during burst window | Penalize burst, don't block |
 | `restore` | Remove enforcement limit or reset counter | Return to normal operation |
 
+### 7.4 Payment Failure Triggers
+
+In addition to balance-threshold enforcement (§7.1), Meteridian triggers
+enforcement actions when the Payment Service Provider reports payment failures.
+This bridges the dunning lifecycle (owned by the PSP or Lago) with service
+enforcement (owned by Meteridian).
+
+**Trigger source:** PSP webhook events ingested via the pluggable payment
+provider adapter (ADR-0010). Meteridian does NOT own payment collection —
+it reacts to external payment status signals.
+
+| PSP Event | Meteridian Action | Enforcement Effect |
+|-----------|-------------------|-------------------|
+| `invoice.payment_failed` (1st attempt) | Notify | Warning header; no service impact |
+| `invoice.payment_failed` (retry exhausted) | Throttle | Graduated degradation per dunning policy |
+| `invoice.overdue` (past grace period) | Block | Service suspension via Limitador or K8s quota |
+| `invoice.written_off` | Terminate | Full service removal (K8s namespace delete, VM destroy) |
+| `invoice.paid` (after dunning) | Restore | Lift all enforcement; reset to normal |
+
+**Enforcement signal (payment failure variant):**
+
+```json
+{
+  "specversion": "1.0",
+  "id": "enf-pmt-e5f6g7h8",
+  "type": "billing.enforcement.action",
+  "source": "meteridian/enforcement",
+  "time": "2026-07-15T09:00:00Z",
+  "subject": "tenant-bob",
+  "datacontenttype": "application/json",
+  "data": {
+    "tenant_id": "tenant-bob",
+    "action": "throttle",
+    "reason": "payment_failed",
+    "invoice_id": "INV-2026-001234",
+    "dunning_step": 3,
+    "days_overdue": 14,
+    "amount_due": 4250.00,
+    "currency": "EUR",
+    "effective_at": "2026-07-15T09:00:00Z",
+    "enforcement_target": "limitador",
+    "limitador_action": {
+      "type": "reduce_rate",
+      "namespace": "ai-gateway",
+      "limit_name": "tenant-bob-tokens",
+      "reduction_pct": 50
+    }
+  }
+}
+```
+
+**Dunning policy configuration (Fluxo workflow):**
+
+Dunning-to-enforcement escalation is configured as a Fluxo workflow, allowing
+operators to customize retry timing, grace periods, and enforcement graduation:
+
+```yaml
+dunning_enforcement_policy:
+  name: "default-dunning-escalation"
+  triggers:
+    - event: "invoice.payment_failed"
+      retry: 1
+      action: "notify"
+      delay: "0s"
+    - event: "invoice.payment_failed"
+      retry: 3
+      action: "throttle"
+      params: { reduction_pct: 50 }
+      delay: "72h"
+    - event: "invoice.overdue"
+      grace_days: 14
+      action: "block"
+    - event: "invoice.overdue"
+      grace_days: 30
+      action: "terminate"
+  restore:
+    event: "invoice.paid"
+    action: "restore"
+    immediate: true
+```
+
+**Key design decisions:**
+
+1. **Meteridian does NOT retry payments** — that is the PSP's or Lago's
+   responsibility. Meteridian only reacts to the outcome.
+2. **Fail-open for webhook delivery** — if the PSP webhook is delayed or
+   missed, enforcement is not applied prematurely. A reconciliation job
+   periodically queries outstanding invoice status.
+3. **Graduated, not binary** — payment failures escalate through the same
+   graduated enforcement signals (§7.3), not an immediate hard block.
+4. **Idempotent** — receiving the same webhook twice does not double-apply
+   enforcement. The enforcement FSM tracks the current dunning step.
+5. **Audit trail** — all payment-failure enforcement signals are recorded in
+   the cryptographic audit log (ADR-0014) for dispute resolution.
+
 ---
 
 ## 8. Failure Modes and Resilience
@@ -837,6 +932,8 @@ X-RateLimit-Reset: 1719849600
 
 - [METR-0004](../0004-credit-token-billing/credit-token-billing.md) — Credit,
   Prepaid, and Token Billing (balance management, bill shock prevention)
+- [METR-0009](../0009-e-invoicing-engine/e-invoicing-engine.md) — Native
+  E-Invoicing Engine (invoice payment lifecycle FSM, dunning status source)
 - [METR-0010](../0010-ai-metering/ai-metering.md) — AI Workload Metering
   (MaaS plugin, CloudEvents, Limitador context)
 - [METR-0002](../0002-extensibility/extensibility.md) — Platform Extensibility

@@ -213,7 +213,7 @@ to a global telco sovereign cloud.
 | ID | Requirement | Priority |
 |----|-------------|----------|
 | FR-1101 | On-premises deployment (Helm chart, no cloud dependency) | Must |
-| FR-1102 | Single-binary micro profile (PostgreSQL + Go binary, no other services) | Must |
+| FR-1102 | Single-binary micro profile (PostgreSQL + Go binary, no Valkey/Kafka/NATS) — see [METR-0001 §3](../0001-architecture/architecture.md#micro-pg-only-mode) and [ADR-0011](../../docs/adr/0011-postgres-first-deployment-profiles.md) | Must |
 | FR-1103 | Horizontal scaling to >= 1M events/sec | Must |
 | FR-1104 | PostgreSQL HA via CloudNativePG (5-10s failover) | Must |
 | FR-1105 | Air-gapped deployment support (no internet required) | Must |
@@ -312,7 +312,9 @@ to a global telco sovereign cloud.
 
 - **US-020:** As an infrastructure architect, I want to deploy Meteridian on a
   single air-gapped RHEL server with just PostgreSQL and a Go binary -- no
-  Kafka, no Redis, no internet -- for a small 50-node cluster.
+  Kafka, no Valkey, no internet -- for a small 50-node cluster. (Micro
+  PG-only mode; upgrade triggers in [METR-0001 §3](../0001-architecture/architecture.md)
+  and [ADR-0011](../../docs/adr/0011-postgres-first-deployment-profiles.md).)
 
 - **US-021:** As a sovereign cloud operator, I want to guarantee that metering
   data from French tenants never leaves the EU data center, enforced by policy,
@@ -338,7 +340,7 @@ to a global telco sovereign cloud.
 
 1. **Language:** Go (backend), React + TypeScript (frontend)
 2. **License:** Apache 2.0 for all Meteridian code
-3. **Databases:** PostgreSQL (mandatory), Valkey (mandatory for Standard+), ClickHouse (optional)
+3. **Databases:** PostgreSQL (mandatory all profiles), Valkey (Small+ default; Micro uses PostgreSQL backends per [ADR-0011](../../docs/adr/0011-postgres-first-deployment-profiles.md)), ClickHouse (optional Enterprise OLAP)
 4. **Deployment:** Kubernetes (primary), single-binary (micro), bare-metal (supported)
 5. **Minimum resource:** Single-binary profile: 2 CPU, 4GB RAM, 50GB disk
 6. **No vendor lock-in:** No hard dependency on any cloud provider or proprietary service

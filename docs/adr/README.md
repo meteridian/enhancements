@@ -14,6 +14,7 @@ ADRs document significant architectural decisions, including the context, decisi
 | [ADR-0002](0002-valkey-balance-management.md) | Valkey for real-time balance management | Accepted |
 | [ADR-0003](0003-gorules-rating-engine.md) | GoRules ZEN Engine for rating rules | Accepted |
 | [ADR-0004](0004-cloudevents-event-format.md) | CloudEvents as canonical event format | Accepted |
+| [ADR-0011](0011-postgres-first-deployment-profiles.md) | Postgres-first deployment profiles and upgrade triggers | Accepted |
 
 ### Extensibility (see extensibility PR)
 
@@ -29,7 +30,7 @@ ADRs document significant architectural decisions, including the context, decisi
 ## Creating New ADRs
 
 1. Copy the template from any existing ADR
-2. Number sequentially (next: ADR-0011)
+2. Number sequentially (next: ADR-0012)
 3. Use kebab-case filenames: `NNNN-short-title.md`
 4. Set status to `Proposed` until reviewed, then `Accepted`
 5. Never delete or renumber ADRs; supersede with a new one

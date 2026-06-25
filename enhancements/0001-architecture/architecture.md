@@ -3,7 +3,7 @@
 - **Status:** provisional
 - **Authors:** @pgarciaq
 - **Created:** 2026-06-18
-- **Last Updated:** 2026-06-18
+- **Last Updated:** 2026-06-25
 
 ## Summary
 
@@ -205,28 +205,124 @@ Optimization/AI stages run on the warm path (async fan-out copy), NOT in the hot
 path. If they produce lifecycle events (e.g., "resize VM"), those enter the hot
 path as new events.
 
-## 3. Database Architecture
+## 3. Storage and Deployment Profiles
 
 ### Core Principle
 
-**Invariant across ALL deployment profiles: PostgreSQL + Valkey. Two databases.**
+**PostgreSQL is the system of record for every profile.** Metering events, catalog
+data, tenant schemas, and (in Micro) hot-path projections all land in PostgreSQL.
+Optional components — Valkey, NATS/Kafka, TimescaleDB, ClickHouse — are added when
+scale or latency requirements exceed what a single database can deliver alone.
 
-| Profile | Analytics Layer | Config/Billing | Real-Time Balances |
-|---------|----------------|----------------|--------------------|
-| **Micro** | PostgreSQL (vanilla, partitioned tables) | Same PostgreSQL instance | In-process Go cache (ristretto) |
-| **Small** | PostgreSQL + TimescaleDB extension | Same PostgreSQL instance | Valkey |
-| **Standard** | PostgreSQL + TimescaleDB | PostgreSQL | Valkey |
-| **Enterprise** | ClickHouse (optional read accelerator) | PostgreSQL | Valkey cluster |
-| **Hyperscale** | Citus (horizontal sharding by tenant_id) | PostgreSQL | Valkey cluster |
+The [Postgres Is Enough](https://postgresisenough.dev/) philosophy informs the
+**Micro** profile: start with one PostgreSQL instance and one Go binary, prove value
+on small clusters, then upgrade deliberately. This does **not** replace Valkey at
+Standard and above; telco-grade rating at scale still depends on in-memory balance
+management per [ADR-0002](../../docs/adr/0002-valkey-balance-management.md).
+
+See [ADR-0011](../../docs/adr/0011-postgres-first-deployment-profiles.md) for the
+formal decision, interface contracts, and upgrade triggers.
+
+### Micro: PG-Only Mode
+
+The **Micro** profile satisfies [FR-1102](../0000-requirements/requirements.md) and
+[US-020](../0000-requirements/requirements.md): a single air-gapped RHEL server with
+PostgreSQL and one Go binary — no Valkey, no Kafka, no NATS, no internet.
+
+| Component | Micro implementation |
+|-----------|---------------------|
+| **Process model** | Single binary (ingest, validate, dedup, enrich, rate, store, API) |
+| **Event store** | PostgreSQL with native range partitioning (monthly `usage_start`) |
+| **Balances / idempotency** | PostgreSQL tables + advisory locks or `SELECT … FOR UPDATE` |
+| **Enrichment cache** | In-process Go cache (ristretto), optional PG materialized views |
+| **Event transport** | In-process channels (no external bus) |
+| **Target scale** | ≤ 5K events/sec, single replica, ≤ 50-node clusters |
+
+Micro trades sub-millisecond balance latency for operational simplicity. Balance
+queries may exceed [FR-302](../0000-requirements/requirements.md) p99 targets under
+concurrent load; that is acceptable until an upgrade trigger fires.
+
+### Deployment Profile Matrix
+
+| Profile | Event store | Config / billing | Balances | Idempotency | Event transport | OLAP read path |
+|---------|-------------|------------------|----------|-------------|-----------------|----------------|
+| **Micro** | PostgreSQL (partitioned) | Same instance | PostgreSQL (`BalanceStore`) | PostgreSQL (`IdempotencyStore`) | In-process (`EventTransport`) | PostgreSQL |
+| **Small** | PostgreSQL + TimescaleDB | Same instance | Valkey | Valkey or PostgreSQL | Optional NATS | PostgreSQL + continuous aggregates |
+| **Standard** | PostgreSQL + TimescaleDB | PostgreSQL (CNPG HA) | Valkey | Valkey | NATS or Kafka | PostgreSQL + continuous aggregates |
+| **Enterprise** | PostgreSQL + TimescaleDB | PostgreSQL (CNPG multi-AZ) | Valkey cluster | Valkey cluster | NATS or Kafka | ClickHouse (optional accelerator) |
+| **Hyperscale** | Citus (shard by `tenant_id`) | PostgreSQL | Valkey cluster | Valkey cluster | NATS or Kafka | ClickHouse (optional) |
+
+**Operational footprint by profile:**
+
+| Profile | Mandatory services | Typical optional add-ons |
+|---------|---------------------|--------------------------|
+| **Micro** | PostgreSQL + Go binary | — |
+| **Small+** | PostgreSQL (+ TimescaleDB from Small) + Valkey | NATS, object storage for backups |
+| **Standard+** | Above + event bus + CNPG HA | Prometheus, Lago connector |
+| **Enterprise** | Above + Valkey cluster | ClickHouse for OLAP dashboards |
+
+### Pluggable Backend Interfaces
+
+Hot-path storage and messaging are **interface-driven**, not hard-coded. The rating
+pipeline depends on three contracts; each profile selects a concrete implementation
+via configuration (Helm values or single-binary flags):
+
+```go
+// BalanceStore — real-time wallet / budget enforcement
+type BalanceStore interface {
+    GetBalance(ctx context.Context, tenantID, walletID string) (decimal.Decimal, error)
+    CheckAndDecrement(ctx context.Context, tenantID, walletID string, amount decimal.Decimal) (decimal.Decimal, error)
+    SetBalance(ctx context.Context, tenantID, walletID string, amount decimal.Decimal) error
+}
+
+// IdempotencyStore — exactly-once event deduplication
+type IdempotencyStore interface {
+    Seen(ctx context.Context, idempotencyKey string) (bool, error)
+    Mark(ctx context.Context, idempotencyKey string, ttl time.Duration) error
+}
+
+// EventTransport — decouple ingest from rating workers
+type EventTransport interface {
+    Publish(ctx context.Context, topic string, event cloudevents.Event) error
+    Subscribe(ctx context.Context, topic string, handler func(cloudevents.Event) error) error
+}
+```
+
+| Interface | Micro (PG) | Standard+ |
+|-----------|------------|-----------|
+| `BalanceStore` | PostgreSQL row locks + balance table; rebuild from event store on startup | Valkey Lua scripts ([ADR-0002](../../docs/adr/0002-valkey-balance-management.md)) |
+| `IdempotencyStore` | PostgreSQL `idempotency_keys` table with TTL cleanup job | Valkey SET NX + TTL (or PostgreSQL fallback) |
+| `EventTransport` | In-process buffered channel (single goroutine consumer) | NATS JetStream or Kafka ([ADR-0004](../../docs/adr/0004-cloudevents-event-format.md) envelope) |
+
+PostgreSQL implementations are **correctness-first**; Valkey/NATS implementations
+are **latency-first**. Both must produce identical rated events given the same input
+stream — verified by conformance tests in the implementation repo.
+
+### Upgrade Triggers
+
+Add components when measured pain exceeds profile limits, not preemptively:
+
+| Trigger | Symptom | Upgrade to | Rationale |
+|---------|---------|------------|-----------|
+| **Valkey** | Multi-replica rating deploys; wallet row lock contention on PostgreSQL; balance p99 > 50ms ([FR-302](../0000-requirements/requirements.md)); prepaid enforcement races under concurrent events | Valkey `BalanceStore` + `IdempotencyStore` | Sub-ms atomic check-and-decrement; removes PG hot-row bottleneck |
+| **Event bus** | Ingest p99 > 500ms; sustained throughput > 10K events/sec; need ingest/rating decoupling for rolling upgrades | NATS JetStream or Kafka `EventTransport` | Buffer spikes; replay after failure; horizontal rating workers |
+| **TimescaleDB** | Event table > 100M rows; rollup queries > 5s; compression desired on historical chunks | TimescaleDB extension on existing PG ([ADR-0001](../../docs/adr/0001-timescaledb-event-store.md)) | Hypertables, continuous aggregates, 10–20× compression — **Small+** default |
+| **ClickHouse** | Enterprise OLAP dashboards; ad-hoc analytics over billions of rows; FinOps team needs sub-second aggregations across all tenants | ClickHouse read replica fed by PG logical replication or batch export | OLAP read accelerator only — PostgreSQL remains write path |
+| **Citus** | Write TPS > 50K sustained; single PG node storage > 10TB | Citus sharding by `tenant_id` | Hyperscale horizontal write scaling |
+
+Upgrades are **additive**: Micro → Small adds TimescaleDB + Valkey without
+rewriting application logic — swap interface implementations and run migration jobs
+to warm Valkey from PostgreSQL balance projections.
 
 ### Key Principles
 
 - The system ALWAYS writes metering events to PostgreSQL (time-based partitioning)
-- TimescaleDB continuous aggregates pre-compute rollups (hourly, daily, monthly)
-- ClickHouse is introduced ONLY as an optional read-path accelerator
-- For micro profile: even Valkey is optional (use in-process Go cache)
+- TimescaleDB continuous aggregates pre-compute rollups (hourly, daily, monthly) from **Small** upward
+- ClickHouse is introduced ONLY as an optional read-path accelerator at **Enterprise**
+- Micro uses PostgreSQL for all hot-path state; Valkey is the Standard+ default per ADR-0002
 
-**Databases the team must support: 2** (PostgreSQL, Valkey). ClickHouse is optional.
+**Databases the team must support in production:** PostgreSQL (all profiles), Valkey
+(Small through Hyperscale). ClickHouse and Citus are optional upgrade paths.
 
 ### TimescaleDB vs. Citus
 
@@ -264,7 +360,9 @@ or ImageVolume extensions (K8s 1.33+).
 | **Standard** | 0 | < 5 min | CloudNativePG (3 instances, synchronous) |
 | **Enterprise** | 0 | < 1 min | CloudNativePG (3+, multi-AZ), Valkey cluster |
 
-Safety net: event bus (NATS/Kafka) allows replay of unprocessed events after recovery.
+Safety net: from **Small** upward, the event bus (NATS/Kafka) allows replay of
+unprocessed events after recovery. **Micro** replays from PostgreSQL ingest log /
+unprocessed event queue tables.
 
 ## 4. Metering Dimensions
 

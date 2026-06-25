@@ -214,6 +214,165 @@ but remain usable. Notifications are sent at the start of the grace period.
 
 ## 4. Committed Spend Contracts
 
+### 4.0 Quote Generation
+
+A **quote** is a proposed contract that has not yet been accepted. It captures
+a customer-specific pricing proposal generated from the Product Catalog
+(METR-0003) and Pricing Simulation, serving as the bridge between "browsing
+the catalog" and "signing a commitment."
+
+#### 4.0.1 Quote Data Model
+
+```go
+type Quote struct {
+    ID              uuid.UUID       `json:"id"`
+    TenantID        uuid.UUID       `json:"tenant_id"`
+    Name            string          `json:"name"`
+    Status          QuoteStatus     `json:"status"`
+    ValidUntil      time.Time       `json:"valid_until"`
+    CreatedAt       time.Time       `json:"created_at"`
+    AcceptedAt      *time.Time      `json:"accepted_at,omitempty"`
+    CreatedBy       string          `json:"created_by"`
+    Items           []QuoteItem     `json:"items"`
+    PricingSummary  PricingSummary  `json:"pricing_summary"`
+    ContractTerms   *ContractTerms  `json:"contract_terms,omitempty"`
+    SimulationRef   *uuid.UUID      `json:"simulation_ref,omitempty"`
+    Notes           string          `json:"notes,omitempty"`
+    Metadata        map[string]any  `json:"metadata,omitempty"`
+}
+
+type QuoteItem struct {
+    ProductID       uuid.UUID       `json:"product_id"`
+    PlanID          uuid.UUID       `json:"plan_id"`
+    Quantity        *int            `json:"quantity,omitempty"`
+    OverriddenRate  *Money          `json:"overridden_rate,omitempty"`
+    DiscountPct     *float64        `json:"discount_pct,omitempty"`
+}
+
+type ContractTerms struct {
+    Duration        string          `json:"duration"`
+    CommittedSpend  Money           `json:"committed_spend"`
+    RampSchedule    []RampPeriod    `json:"ramp_schedule,omitempty"`
+    BurstRateCardID *uuid.UUID      `json:"burst_rate_card_id,omitempty"`
+    RolloverPolicy  string          `json:"rollover_policy"`
+    TrueUpPolicy    string          `json:"true_up_policy"`
+}
+
+type PricingSummary struct {
+    MonthlyEstimate Money           `json:"monthly_estimate"`
+    TotalCommitment Money           `json:"total_commitment"`
+    EffectiveRate   Money           `json:"effective_rate"`
+    Discount        float64         `json:"discount_pct"`
+    SimulatedFrom   *time.Time      `json:"simulated_from,omitempty"`
+    SimulatedTo     *time.Time      `json:"simulated_to,omitempty"`
+}
+
+type QuoteStatus string
+
+const (
+    QuoteDraft    QuoteStatus = "draft"
+    QuoteSent     QuoteStatus = "sent"
+    QuoteAccepted QuoteStatus = "accepted"
+    QuoteRejected QuoteStatus = "rejected"
+    QuoteExpired  QuoteStatus = "expired"
+    QuoteRevised  QuoteStatus = "revised"
+)
+```
+
+#### 4.0.2 Quote Lifecycle
+
+```
+    create (from catalog + simulation)
+                │
+                ▼
+          ┌─────────┐
+          │  DRAFT  │◄──── revise
+          └────┬────┘        ▲
+               │ send        │
+               ▼             │
+          ┌────────┐    ┌────────┐
+          │  SENT  │───▶│REVISED │
+          └────┬───┘    └────────┘
+               │
+        ┌──────┼──────┐
+        │      │      │
+        ▼      ▼      ▼
+   ┌────────┐ ┌──────┐ ┌────────┐
+   │ACCEPTED│ │EXPIRED│ │REJECTED│
+   └───┬────┘ └──────┘ └────────┘
+       │
+       │ convert to contract (§4.1)
+       ▼
+   ┌──────────┐
+   │ CONTRACT │ (CommittedSpendContract with status=active)
+   └──────────┘
+```
+
+#### 4.0.3 Quote API
+
+```
+POST   /api/v1/quotes                           # Create quote from catalog items
+POST   /api/v1/quotes/from-simulation/{sim_id}  # Create quote from a pricing simulation result
+GET    /api/v1/quotes                           # List quotes (filterable by status, tenant)
+GET    /api/v1/quotes/{id}                      # Get quote details
+PATCH  /api/v1/quotes/{id}                      # Update draft quote (items, terms, notes)
+POST   /api/v1/quotes/{id}/send                 # Mark as sent (notify customer, start validity timer)
+POST   /api/v1/quotes/{id}/accept               # Customer accepts → creates contract + credit grants
+POST   /api/v1/quotes/{id}/reject               # Customer rejects (with optional reason)
+POST   /api/v1/quotes/{id}/revise               # Create revised version (links to original)
+GET    /api/v1/quotes/{id}/pdf                  # Render quote as PDF (uses invoice template engine from METR-0009)
+DELETE /api/v1/quotes/{id}                      # Delete draft quote
+```
+
+#### 4.0.4 Quote-to-Contract Conversion
+
+When a quote is accepted (`POST /quotes/{id}/accept`), Meteridian automatically:
+
+1. Creates a `CommittedSpendContract` (§4.1) from the quote's `contract_terms`
+2. Provisions initial credit grants (§3) based on the contract's first period
+3. Activates the associated rate card for the tenant
+4. Emits a `billing.quote.accepted` CloudEvent for external systems (CRM sync,
+   provisioning triggers, Order Management — see METR-0015)
+5. If the quote links to a pricing simulation (`simulation_ref`), records the
+   simulation-to-actual conversion for analytics
+
+#### 4.0.5 Integration with Pricing Simulation
+
+Quotes can be generated directly from a pricing simulation result:
+
+```
+POST /api/v1/quotes/from-simulation/{sim_id}
+```
+
+This pre-fills the quote with the simulated rate plan, estimated costs, and
+projected savings vs. on-demand pricing. The `PricingSummary.simulated_from`
+and `simulated_to` fields preserve the simulation window for transparency.
+
+**Use case:** Operator runs a simulation ("what if tenant-X committed to
+$50K/year?"), sees the projected margin, and generates a quote directly from
+the simulation results. The customer sees the exact pricing that was modeled.
+
+#### 4.0.6 Approval Workflows (Fluxo)
+
+Optionally, quotes requiring non-standard discounts can be routed through an
+approval workflow:
+
+```yaml
+quote_approval_policy:
+  name: "discount-approval"
+  rules:
+    - condition: "quote.items[*].discount_pct > 20"
+      action: "require_approval"
+      approver: "sales-manager"
+    - condition: "quote.pricing_summary.total_commitment > 100000"
+      action: "require_approval"
+      approver: "finance-director"
+  timeout: "72h"
+  on_timeout: "expire_quote"
+```
+
+---
+
 ### 4.1 Contract Model
 
 A committed spend contract represents a multi-period agreement where a tenant

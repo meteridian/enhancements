@@ -105,18 +105,13 @@ flowchart LR
 ## Tool Coverage by Layer
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#1f77b4'}}}%%
-block-beta
-    columns 7
-    block:header
-        h1["Catalog &\nPricing"]
-        h2["Quote &\nContract"]
-        h3["Metering &\nMediation"]
-        h4["Rating &\nCharging"]
-        h5["Billing &\nInvoicing"]
-        h6["Collection &\nSettlement"]
-        h7["Governance &\nIntelligence"]
-    end
+graph LR
+    L1[Catalog & Pricing<br/>3 modules] --> L2[Quote & Contract<br/>3 modules]
+    L2 --> L3[Metering & Mediation<br/>5 modules]
+    L3 --> L4[Rating & Charging<br/>5 modules]
+    L4 --> L5[Billing & Invoicing<br/>5 modules]
+    L5 --> L6[Collection & Settlement<br/>3 modules]
+    L6 --> L7[Governance & Intelligence<br/>7 modules]
 ```
 
 | Layer | Monetize360 | OpenMeter | Meteridian | RH Cost Mgmt | Lago | Metronome |
@@ -272,9 +267,9 @@ block-beta
 ```mermaid
 quadrantChart
     title Revenue Lifecycle Coverage vs. Deployment Flexibility
-    x-axis "Narrow (Billing Only)" --> "Broad (Full Q2C + Infra)"
+    x-axis "Narrow - Billing Only" --> "Broad - Full Q2C + Infra"
     y-axis "Cloud-Only / Proprietary" --> "Self-Hosted / Open Source"
-    quadrant-1 "Meteridian's Territory"
+    quadrant-1 "Meteridian Territory"
     quadrant-2 "FinOps Tools"
     quadrant-3 "SaaS Billing"
     quadrant-4 "Enterprise Q2C"

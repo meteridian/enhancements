@@ -170,6 +170,82 @@ The collector is deployed as:
 
 All sources emit CloudEvents to the Meteridian ingestion API.
 
+### 1.1 Collection backends and fidelity tiers
+
+Kubernetes metering does **not** require Prometheus. The collector always needs
+a **data source**; deployment packaging (Helm chart, OCP operator, or standalone
+binary) is independent of which backend supplies metrics.
+
+| Packaging | Role |
+|-----------|------|
+| Helm chart / OCP operator | Kubernetes-native deployment with preset configs |
+| Standalone binary | Same collector logic for edge, CI, or non-cluster hosts — **not** "no metrics backend" |
+
+Collection fidelity is tiered so capacity-only clusters can meter without a
+time-series store, while usage- and history-based billing requires Tier 1.
+
+#### Tier 0 — Kubernetes API (capacity and allocation)
+
+Queries the Kubernetes API for **requests, limits, allocatable capacity, and
+labels** on pods, nodes, namespaces, PVCs, and VMs (KubeVirt). No Prometheus or
+metrics-server dependency.
+
+- **Use case:** Capacity and allocation costing (chargeback by requested or
+  allocated resources, not observed utilization)
+- **Data:** Point-in-time or periodic snapshots; no historical usage curves
+- **Sources:** Redpanda Connect Kubernetes input, `ocp-operator` preset,
+  `meteridian-collector` Tier-0 preset
+
+#### Tier 1 — Prometheus-compatible query API (usage and history)
+
+Queries a **Prometheus-compatible HTTP API** for utilization, GPU metrics, and
+retained time series. Required for usage-based metering, GPU billing, and
+lookback windows beyond a single scrape.
+
+Supported backends (configure `query_url` per cluster):
+
+| Platform | Typical query endpoint |
+|----------|------------------------|
+| OpenShift | Thanos querier or in-cluster Prometheus |
+| EKS | Amazon Managed Prometheus (AMP) or self-managed Prometheus/Thanos |
+| AKS | Azure Monitor managed Prometheus or self-managed |
+| GKE | Google Managed Prometheus (GMP) or self-managed |
+
+Helm and operator presets (`ocp-operator`, `meteridian-collector`) set
+`query_url` and auth for the target platform; Tier 1 is optional and enabled
+when a compatible endpoint is available.
+
+#### metrics-server is not billing-grade
+
+The Kubernetes **metrics-server** exposes recent CPU/memory usage via the
+Metrics API but has **no retention**, a **short aggregation window** (~15
+minutes), and no GPU or custom-metric history. It is suitable for HPA and
+scheduling, **not** for billing-grade metering. Tier 1 requires a
+Prometheus-compatible store with durable retention.
+
+#### Deferred: direct kubelet scrape
+
+Scraping kubelets or cAdvisor directly (bypassing a central TSDB) is **deferred**.
+It duplicates platform monitoring, complicates auth and cardinality, and does not
+provide the retention Tier 1 requires. Revisit only if a platform lacks any
+Prometheus-compatible query API.
+
+#### CloudEvents fidelity metadata
+
+Every Kubernetes-sourced CloudEvent SHOULD include extension
+`meteridian.fidelity_tier`:
+
+| Value | Meaning |
+|-------|---------|
+| `0` | Capacity/allocation data from Kubernetes API only |
+| `1` | Usage or history from Prometheus-compatible query API |
+
+Downstream rating and product catalog rules MAY treat tiers differently (e.g.,
+request-based vs usage-based rate plans). See
+[METR-0012](../0012-multi-cloud-metering/multi-cloud-metering.md) for
+cross-cloud normalization when the same workload spans Tier 0 on-prem and Tier 1
+in managed Kubernetes.
+
 ## 2. Performance Budget
 
 ### Target SLAs

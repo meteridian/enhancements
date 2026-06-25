@@ -128,6 +128,91 @@ graph LR
 
 ---
 
+## Detailed Phase Coverage Matrix (Transposed)
+
+Tools as rows, all 31 modules as columns — ordered left-to-right from infrastructure-adjacent to governance.
+
+**Legend:** ✅ Full | ⚠️ Partial | 🔵 Planned | ➡️ Delegates | ❌ None
+
+### Layer 3: Metering & Mediation
+
+| Tool | Metering | Mediation | Infra Collectors | AI/ML Metering | Multi-Cloud |
+|------|:--------:|:---------:|:----------------:|:--------------:|:-----------:|
+| **Meteridian** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Monetize360** | ✅ | ✅ | ❌ | ✅ | ⚠️ |
+| **RH Cost Mgmt** | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| **OpenMeter** | ✅ | ⚠️ | ❌ | ⚠️ | ❌ |
+| **Lago** | ✅ | ⚠️ | ❌ | ❌ | ❌ |
+| **Metronome** | ✅ | ⚠️ | ❌ | ⚠️ | ❌ |
+
+### Layer 4: Rating & Charging
+
+| Tool | Rating Engine | Discounts | Wallet/Credits | Entitlements | Budget Enforcement |
+|------|:------------:|:---------:|:--------------:|:------------:|:------------------:|
+| **Meteridian** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Monetize360** | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| **OpenMeter** | ⚠️ | ⚠️ | ✅ | ✅ | ❌ |
+| **Lago** | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **Metronome** | ✅ | ⚠️ | ✅ | ⚠️ | ❌ |
+| **RH Cost Mgmt** | ⚠️ | ⚠️ | ❌ | ❌ | ❌ |
+
+### Layer 1: Catalog & Pricing
+
+| Tool | Product Catalog | Pricing/Rate Cards | Pricing Simulation |
+|------|:---------------:|:------------------:|:------------------:|
+| **Meteridian** | ✅ | ✅ | ✅ |
+| **Monetize360** | ✅ | ✅ | ⚠️ |
+| **OpenMeter** | ✅ | ✅ | ❌ |
+| **Lago** | ✅ | ✅ | ❌ |
+| **Metronome** | ⚠️ | ✅ | ❌ |
+| **RH Cost Mgmt** | ❌ | ⚠️ | ❌ |
+
+### Layer 2: Quote & Contract
+
+| Tool | Quoting/CPQ | Contract Mgmt | Order Mgmt |
+|------|:-----------:|:-------------:|:----------:|
+| **Meteridian** | 🔵 | ✅ | 🔵 |
+| **Monetize360** | ✅ | ✅ | ✅ |
+| **Metronome** | ❌ | ✅ | ❌ |
+| **OpenMeter** | ❌ | ❌ | ❌ |
+| **Lago** | ❌ | ❌ | ❌ |
+| **RH Cost Mgmt** | ❌ | ❌ | ❌ |
+
+### Layer 5: Billing & Invoicing
+
+| Tool | Charge Calc | Invoice Gen | E-Invoicing | Tax Calc | Credit Notes |
+|------|:-----------:|:-----------:|:-----------:|:--------:|:------------:|
+| **Meteridian** | 🔵 | 🔵 | 🔵 | 🔵 | 🔵 |
+| **Monetize360** | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **OpenMeter** | ✅ | ✅ | ❌ | ➡️ | ⚠️ |
+| **Lago** | ✅ | ✅ | ❌ | ➡️ | ✅ |
+| **Metronome** | ✅ | ✅ | ❌ | ➡️ | ⚠️ |
+| **RH Cost Mgmt** | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+### Layer 6: Collection & Settlement
+
+| Tool | Payment/Dunning | Partner Settlement | Revenue Recognition |
+|------|:---------------:|:------------------:|:-------------------:|
+| **Meteridian** | 🔵 | 🔵 | 🔵 |
+| **Monetize360** | ✅ | ✅ | ✅ |
+| **OpenMeter** | ➡️ | ❌ | ❌ |
+| **Lago** | ➡️ | ❌ | ❌ |
+| **Metronome** | ➡️ | ❌ | ❌ |
+| **RH Cost Mgmt** | ❌ | ❌ | ❌ |
+
+### Layer 7: Governance & Intelligence
+
+| Tool | Rev Assurance | Analytics | Unit Economics | Forecasting | Cost Alloc | Portal | Legal/Regulatory |
+|------|:------------:|:---------:|:--------------:|:-----------:|:----------:|:------:|:----------------:|
+| **Meteridian** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Monetize360** | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ |
+| **RH Cost Mgmt** | ❌ | ✅ | ❌ | ⚠️ | ✅ | ✅ | ❌ |
+| **OpenMeter** | ❌ | ⚠️ | ❌ | ❌ | ❌ | ⚠️ | ❌ |
+| **Lago** | ❌ | ⚠️ | ❌ | ❌ | ❌ | ⚠️ | ❌ |
+| **Metronome** | ❌ | ⚠️ | ❌ | ❌ | ❌ | ⚠️ | ❌ |
+
+---
+
 ## Detailed Module Comparison
 
 ### Legend

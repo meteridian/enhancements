@@ -26,6 +26,9 @@ enhancements/                          # Enhancement proposals (METRs)
   0007-legal-regulatory-compliance/    # METR-0007: Legal and regulatory compliance
   0008-compliance-as-code/             # METR-0008: Compliance-as-code and audit trails
   0009-e-invoicing-engine/             # METR-0009: Native e-invoicing engine
+  0010-ai-metering/                    # METR-0010: AI workload metering
+  0011-enforcement-integration/        # METR-0011: Enforcement integration (Limitador)
+  0012-multi-cloud-metering/           # METR-0012: Multi-cloud and hybrid metering
 docs/
   assets/                              # Logo and branding assets (SVG and PNG)
   adr/                                 # Architecture Decision Records (ADRs)

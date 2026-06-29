@@ -19,7 +19,7 @@
 6. [Plugin Runtime Model](#6-plugin-runtime-model)
 7. [Observability and Performance](#7-observability-and-performance)
 8. [AI-First Extensibility](#8-ai-first-extensibility)
-9. [Marketplace and Developer Program](#9-marketplace-and-developer-program)
+22. [Marketplace and Developer Program](#9-marketplace-and-developer-program)
 10. [Pluggable Payment Providers](#10-pluggable-payment-providers)
 11. [Capability-Based Block Security](#11-capability-based-block-security)
 12. [Stateful Blocks](#12-stateful-blocks)
@@ -1245,6 +1245,36 @@ ran the build.
 - Monthly subscription
 - Usage-based (per-record processed)
 - Freemium (free tier + paid premium features)
+
+### 9.4 FinOps Action Queue Pattern (Future)
+
+> **Status:** Phase 2+ / METR-TBD. Not in v1 core scope. See
+> [ROADMAP.md](../../ROADMAP.md#finops-action-queue-phase-2-metr-tbd).
+
+METR-0011 (Limitador integration) provides **hard enforcement** — quota
+exceeded, request denied. Many FinOps actions are **discretionary**: rightsizing
+a production workload, re-tagging shared resources, or approving a budget
+exception requires human judgment before execution.
+
+The **FinOps action queue** pattern complements hard enforcement:
+
+| Layer | Mechanism | Example |
+|-------|-----------|---------|
+| Automated | METR-0011 / Limitador | Block API call when prepaid balance is zero |
+| Discretionary | Action queue + approval blocks | Route GPU rightsizing opportunity to owner via Slack; proceed only after Jira approval |
+
+**Planned marketplace blocks** (Phase 2+):
+
+- **Slack / Jira approval sink** — post opportunity summary, collect approve/dismiss/snooze responses, resume pipeline on approval
+- **Opportunity case state** — Postgres-backed lifecycle (Created, Under review, Dismissed, Snoozed); not a separate operational database like OpenOps Tables
+- **Tag-owner / BU reference data** — admin UX for virtual tags and cost-group ownership (similar to OpenOps tag-owner mapping, implemented natively)
+
+Design inspiration comes from [OpenOps](../../docs/competitive/competitive.md#finops-and-adjacent-tools)
+Opportunities workflow. OpenOps is adjacent tooling, not a Meteridian dependency —
+the pattern is adoptable via blocks without adopting Baserow or Superset.
+
+Cross-reference: [METR-0011](../0011-enforcement-integration/enforcement-integration.md)
+(automated enforcement), future METR-TBD (action queue METR).
 
 ---
 

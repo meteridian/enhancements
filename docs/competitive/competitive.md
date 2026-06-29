@@ -1,6 +1,6 @@
 # Meteridian Competitive Landscape Analysis
 
-**Status:** Living document | **Last updated:** 2026-06-18
+**Status:** Living document | **Last updated:** 2026-06-29
 
 This document provides a comprehensive competitive analysis across all verticals,
 use cases, and market segments that Meteridian targets. It serves as the strategic
@@ -164,6 +164,33 @@ SaaS integrations. Weaknesses: no automated optimization, limited chargeback.
 
 **CloudZero** uniquely offers unit economics (cost per customer, per feature).
 Weaknesses: no budget management, limited optimization.
+
+### FinOps and Adjacent Tools
+
+These tools sit alongside traditional FinOps dashboards. They automate
+operational FinOps workflows rather than owning the meter-to-bill data plane.
+
+| Tool | License | Focus | Meteridian Relationship |
+|------|---------|-------|-------------------------|
+| **OpenOps** | Apache 2.0 | No-code FinOps automation | Complementary / integrable via blocks |
+
+**OpenOps** is an Apache 2.0, no-code FinOps automation platform. It uses
+Baserow-backed operational tables (workflow state, tag-owner mapping,
+opportunities lifecycle) plus Superset for analytics dashboards. Its strength
+is human-in-the-loop remediation — routing cost opportunities through Slack
+and Jira for review and approval before action.
+
+OpenOps does **not** provide product catalog, rating, billing, or enforcement.
+Its Tables are operational CRUD stores for workflow metadata, not a SQL cost
+analytics engine. Superset handles read-only analytics; Tables track who owns
+which tag, which opportunity is snoozed, and similar operational state.
+
+**Positioning:** OpenOps automates FinOps *actions* on top of cost visibility.
+Meteridian owns the meter → rate → bill → enforce data plane. The platforms
+are complementary: Meteridian supplies authoritative cost and balance data;
+OpenOps-style workflow automation can integrate as marketplace blocks (see
+[METR-0002 §9.4](../../enhancements/0002-extensibility/extensibility.md#94-finops-action-queue-pattern-future)
+and [ROADMAP.md](../../ROADMAP.md)).
 
 ### Meteridian Advantage
 

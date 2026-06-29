@@ -104,6 +104,27 @@ Target: Marketplace maturity, advanced features, broader ecosystem.
 | METR-TBD | Visual Pipeline Editor | planned | Node-RED-inspired browser UI for pipeline composition |
 | METR-TBD | Multi-Region Federation | planned | Catalog sync, event routing, data residency enforcement |
 | METR-TBD | Advanced Fraud Detection | planned | ML-based anomaly detection blocks for revenue assurance |
+| METR-TBD | FinOps Action Queue | planned | Discretionary, approval-gated FinOps actions alongside METR-0011 automated enforcement. See note below. |
+
+### FinOps Action Queue (Phase 2+, METR-TBD)
+
+Inspired by [OpenOps](https://openops.com/) Opportunities lifecycle (Created →
+Under review / Dismissed / Snoozed), not a dependency. Meteridian v1 focuses on
+the meter → rate → bill → enforce data plane; this deferred capability adds a
+**discretionary action queue** for cost opportunities that require human
+judgment before remediation.
+
+| Aspect | Detail |
+|--------|--------|
+| Scope | Opportunity/case lifecycle, tag-owner routing, snooze and dismiss |
+| Enforcement split | METR-0011 (Limitador) for hard automated enforcement; action queue for approval-gated steps |
+| Integration | Slack/Jira approval blocks in METR-0002 marketplace (see §9.4) |
+| State store | Postgres-backed case records — not a separate Baserow deployment |
+| Phase | Phase 2+; not v1 core |
+
+See [competitive analysis — OpenOps](../../docs/competitive/competitive.md#finops-and-adjacent-tools)
+for adjacent-tool context. A dedicated METR will be created when scope is ready
+for design review.
 
 ### v1.x Compliance and E-Invoicing Expansion (from METR-0008 and METR-0009)
 

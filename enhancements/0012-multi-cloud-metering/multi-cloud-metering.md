@@ -497,6 +497,105 @@ It consumes CloudEvents from the MaaS external metering plugin and GPU metrics
 from the OpenShift Thanos Querier. The multi-cloud extension adds the
 `cloud_provider: "onprem"` metadata field for consistent cross-cloud reporting.
 
+### 4.5 Operator Setup Checklist (Per Provider)
+
+Use these checklists when onboarding a tenant's cloud billing data into
+Meteridian. Split responsibilities between what the **customer configures** in
+their cloud account and what the **Meteridian operator** configures in source
+blocks (Redpanda Connect pipelines or FOCUS ingress).
+
+#### AWS
+
+**Customer configures (cloud-side):**
+
+- [ ] Enable Cost and Usage Report (CUR) delivery to S3 (Parquet or CSV), or
+      configure Cost Explorer API access for aggregated daily costs
+- [ ] Create IAM role or user with least-privilege access:
+      `cloudwatch:GetMetricData`, `ce:GetCostAndUsage`, `s3:GetObject` on the
+      CUR bucket and prefix
+- [ ] If Meteridian runs in a different account, configure cross-account
+      `sts:AssumeRole` trust on the billing/metrics account
+- [ ] Tag AI workloads (Bedrock, SageMaker) with tenant or cost-allocation keys
+      for downstream attribution
+
+**Meteridian source config:**
+
+- [ ] AWS region and account ID
+- [ ] CUR S3 bucket and object prefix (or Cost Explorer-only mode if no CUR)
+- [ ] Credentials: IRSA, workload identity, or assumed-role ARN + external ID
+- [ ] `tenant_id` mapping (static or from resource tags)
+- [ ] Poll interval: ~5 minutes for CloudWatch metrics; daily batch for CUR
+      reconciliation (see [§13 Open Questions](#13-open-questions) on two-speed
+      metering)
+
+#### Azure
+
+**Customer configures (cloud-side):**
+
+- [ ] Enable Cost Management exports and/or Cost Management Query API access
+- [ ] Register a service principal or managed identity with **Monitoring Reader**
+      and **Cost Management Reader** on the subscription or resource group
+- [ ] Grant Azure OpenAI / Azure ML metric read access on Cognitive Services
+      and compute resources
+- [ ] Apply cost allocation tags on deployments and resource groups
+
+**Meteridian source config:**
+
+- [ ] Subscription ID and resource group scope
+- [ ] Azure AD tenant ID, client ID, and client secret (or federated workload
+      identity)
+- [ ] Azure region and OpenAI deployment names
+- [ ] `tenant_id` mapping
+- [ ] Poll interval (typically 5–15 minutes for Monitor metrics)
+
+#### GCP
+
+**Customer configures (cloud-side):**
+
+- [ ] Enable Cloud Monitoring and BigQuery billing export to a dedicated dataset
+- [ ] Create a service account with `roles/monitoring.viewer` and
+      `roles/bigquery.dataViewer` on the billing export dataset
+- [ ] Enable Vertex AI monitoring metrics on prediction endpoints
+- [ ] Label projects and resources for tenant or team attribution
+
+**Meteridian source config:**
+
+- [ ] GCP project ID and billing export BigQuery dataset name
+- [ ] Service account key or Workload Identity binding
+- [ ] Regions and Vertex AI model identifiers to poll
+- [ ] `tenant_id` mapping
+- [ ] Poll interval: ~5 minutes for Monitoring; 4–8 hour lag acceptable for
+      BigQuery billing reconciliation
+
+#### FOCUS (universal — Oracle, IBM, Alibaba, Huawei, any vendor)
+
+FOCUS v1.4 provides a vendor-neutral cost export. Use when native cloud API
+blocks are unavailable or for air-gapped deployments.
+
+**Customer configures (cloud-side):**
+
+- [ ] Export FOCUS v1.4 CSV or JSON from the vendor billing portal, or land
+      files in a customer-controlled S3 bucket or blob container
+- [ ] No cloud API credentials required for push-only delivery
+
+**Meteridian source config:**
+
+- [ ] **Push path:** POST files to `POST /api/v1/ingress/focus` (scheduled or
+      ad hoc upload)
+- [ ] **Pull path:** S3 or blob polling source block with bucket, prefix, and
+      credentials (if Meteridian pulls from customer storage)
+- [ ] `tenant_id` and file naming convention
+- [ ] No live API polling when using push-only FOCUS ingress
+
+#### General notes
+
+| Topic | Guidance |
+|-------|----------|
+| **Pull vs push** | Native blocks (§4.1–4.3) **pull** on a schedule via cloud APIs. FOCUS supports **push** (ingress POST) or **pull** (object storage polling). |
+| **Two-speed metering** | Use real-time metric pipelines for estimates, alerts, and balance enforcement; reconcile daily against authoritative billing (CUR, Azure Cost Management, BigQuery export, FOCUS files). |
+| **Air-gapped / sovereign** | Prefer FOCUS file upload or object-storage polling; no outbound cloud API calls from the Meteridian cluster. |
+| **Kubernetes-only fidelity** | On-prem and RHOAI workloads follow METR-0010 ingestion fidelity; see METR-0001 §1.1 fidelity tiers and ADR-0020 (when published) for cluster-local metering accuracy. |
+
 ---
 
 ## 5. Unified Cost Normalization Layer
